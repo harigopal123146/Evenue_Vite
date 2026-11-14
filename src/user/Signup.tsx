@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
@@ -114,64 +115,43 @@ export default function Signup() {
 
   // ==========================================
   // 3. SUBMIT HANDLER
-  // // ==========================================
-  
-  const API_URL = import.meta.env.VITE_API_URL;
-
-async function doSignup(e: React.FormEvent) {
+  // ==========================================
+  async function doSignup(e: React.FormEvent) {
     e.preventDefault();
 
     if (!validateForm()) return;
 
-    if (!API_URL) {
-        alert("Backend URL is missing. Check Vercel environment variables.");
-        return;
-    }
-
     try {
-        setLoading(true);
+      setLoading(true);
 
-        const payload = {
-            emailid: emailid.trim().toLowerCase(),
-            password: password,
-            utype: utype
-        };
+      const payload = {
+        emailid: emailid.trim().toLowerCase(),
+        password: password,
+        utype: utype,
+      };
 
-        const response = await axios.post(
-            `${API_URL.replace(/\/+$/, "")}/user/signup`,
-            payload,
-            {
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                timeout: 20000
-            }
-        );
 
-        console.log("Signup response:", response.data);
+    
+    // alert(API_URL)
+     const response = await axios.post(`${API_URL}/user/signup`, payload,);
 
-        if (response.data.status === true) {
-            alert(response.data.msg || "Signup Successful!");
-            navigate("/login");
-        } else {
-            alert(response.data.msg || "Signup failed!");
+      if (response.data.status === true) {
+        alert(response.data.msg || '🎉 Signup Successful! Welcome to Evenue.');
+        navigate('/login');
+      } else {
+        alert(response.data.msg || 'Signup failed, please try again.');
+        if (response.data.msg?.toLowerCase().includes('already')) {
+          setErrors((prev) => ({ ...prev, emailid: response.data.msg }));
+          setEmailStatus('Already Registered');
         }
-
+      }
     } catch (error: any) {
-        console.error("Signup error:", error);
-        console.error("Error response:", error.response?.data);
-        console.error("Status:", error.response?.status);
-
-        alert(
-            error.response?.data?.msg ||
-            error.message ||
-            "Unable to connect to backend."
-        );
-
+      console.error('Signup error:', error);
+      alert(error.response?.data?.msg || 'Error connecting to server. Please try again!');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-}
+  }
 
   return (
     <div className="min-h-screen bg-[#FBFBFA] text-[#11130F] flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900">
