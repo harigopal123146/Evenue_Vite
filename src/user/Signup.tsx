@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 
-const BACKEND_URL = 'http://localhost:2005';
+// const BACKEND_URL = 'http://localhost:2005';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function Signup() {
     try {
       setEmailStatus('Checking...');
       
-      const response = await axios.post(`${BACKEND_URL}/user/checkEmail`, {
+      const response = await axios.post(`${API_URL}/user/checkEmail`, {
         emailid: cleanEmail,
       });
 
@@ -129,7 +130,7 @@ export default function Signup() {
       };
 
 
-    const API_URL = import.meta.env.VITE_API_URL;
+    
     // alert(API_URL)
      const response = await axios.post(`${API_URL}/user/signup`, payload,);
 
