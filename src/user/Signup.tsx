@@ -129,8 +129,13 @@ export default function Signup() {
       };
 
 
-
-      const response = await axios.post(`${import.meta.env.API_URL}/user/signup`, payload);
+    const API_URL = import.meta.env.VITE_API_URL;
+    alert(API_URL)
+     const response = await axios.post(`${API_URL}/user/signup`, payload,
+  {
+    withCredentials: true
+  }
+);
 
       if (response.data.status === true) {
         alert(response.data.msg || '🎉 Signup Successful! Welcome to Evenue.');
