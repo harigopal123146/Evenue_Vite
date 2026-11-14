@@ -130,7 +130,7 @@ export default function Signup() {
 
 
     const API_URL = import.meta.env.VITE_API_URL;
-    alert(API_URL)
+    // alert(API_URL)
      const response = await axios.post(`${API_URL}/user/signup`, payload,);
 
       if (response.data.status === true) {
