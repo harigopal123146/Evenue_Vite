@@ -76,17 +76,18 @@ function VendorRegistration() {
     "Mehndi Artist",
     "Bridal Makeup",
     "Wedding Planner",
-    "Cake & Bakery",
+    "Cake",
+    "Wedding Cake",
     "Tent House",
     "Lighting",
     "Invitation Cards",
-    "Sweets & Deserts",
+    "Sweets",
     "Bridal Wear",
-    "Pandit / Officiant",
+    "Pandit",
     "Jagran Party",
     "Bhangra Group",
-    "Event Cleaning",
-    "Security & Valet",
+    "Cleaning",
+  
   ];
 
   // ----------------------------------------------------
