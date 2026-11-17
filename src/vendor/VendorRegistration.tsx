@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+const API_URL = import.meta.env.VITE_API_URL;
 
 // ----------------------------------------------------
 // Interfaces
@@ -124,11 +125,11 @@ function VendorRegistration() {
 
     try {
       setIsCheckingRecord(true);
-      const url = "http://localhost:2005/vendor/vendorFetch";
+      // const url = "http://localhost:2005/vendor/vendorFetch";
       const token = localStorage.getItem("token");
 
       const resp = await axios.post(
-        url,
+        `${API_URL}/vendor/vendorFetch`,
         { emailid: emailToFetch.trim() },
         {
           headers: {
@@ -302,7 +303,7 @@ function VendorRegistration() {
 
     try {
       setLoading(true);
-      const url = "http://localhost:2005/vendor/vendorSave";
+      // const url = "http://localhost:2005/vendor/vendorSave";
       const frmData = new FormData();
 
       frmData.append("emailid", obj.emailid.trim());
@@ -322,7 +323,7 @@ function VendorRegistration() {
 
       const token = localStorage.getItem("token");
 
-      const resp = await axios.post(url, frmData, {
+      const resp = await axios.post(`${API_URL}/vendor/vendorSave`, frmData, {
         headers: {
           authorization: `Bearer ${token}`,
         },
@@ -352,7 +353,7 @@ function VendorRegistration() {
 
     try {
       setLoading(true);
-      const url = "http://localhost:2005/vendor/vendorUpdate";
+      // const url = "http://localhost:2005/vendor/vendorUpdate";
       const frmData = new FormData();
 
       frmData.append("emailid", obj.emailid.trim());
@@ -372,7 +373,7 @@ function VendorRegistration() {
 
       const token = localStorage.getItem("token");
 
-      const resp = await axios.post(url, frmData, {
+      const resp = await axios.post(`${API_URL}/vendor/vendorUpdate`, frmData, {
         headers: {
           authorization: `Bearer ${token}`,
         },

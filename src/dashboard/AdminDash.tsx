@@ -1,6 +1,7 @@
 import  { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export interface UserItem {
   _id?: string;
@@ -10,7 +11,7 @@ export interface UserItem {
   createdAt?: string;
 }
 
-const BASE_URL = "http://localhost:2005/admin";
+// const BASE_URL = "http://localhost:2005/admin";
 
 export default function AdminDash() {
   const navigate = useNavigate();
@@ -51,7 +52,7 @@ export default function AdminDash() {
       setLoading(true);
       setErrorMessage("");
 
-      const response = await axios.post(`${BASE_URL}/fetchallusers`);
+      const response = await axios.post(`${API_URL}/admin/fetchallusers`);
 
       if (response.data && response.data.status && Array.isArray(response.data.data)) {
         setUsers(response.data.data);
@@ -75,7 +76,7 @@ export default function AdminDash() {
     const actionText = newStatus ? "Resumed (Active)" : "Blocked";
 
     try {
-      const response = await axios.post(`${BASE_URL}/updatestatus`, {
+      const response = await axios.post(`${API_URL}/admin/updatestatus`, {
         emailid: emailid,
         status: newStatus,
       });
@@ -106,7 +107,7 @@ export default function AdminDash() {
     if (!confirmDelete) return;
 
     try {
-      const response = await axios.post(`${BASE_URL}/deleteuser`, {
+      const response = await axios.post(`${API_URL}/admin/deleteuser`, {
         emailid: emailid,
       });
 

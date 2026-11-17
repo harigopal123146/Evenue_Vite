@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
+const API_URL = import.meta.env.VITE_API_URL;
 // ----------------------------------------------------
 // Global Axios Interceptor for Token Expiry / Unauthorized Access
 // ----------------------------------------------------
@@ -113,11 +113,11 @@ function CitizenRegistration() {
 
     try {
       setIsCheckingRecord(true);
-      const url = 'http://localhost:2005/citizen/citizenFetch';
+      // const url = 'http://localhost:2005/citizen/citizenFetch';
       const token = localStorage.getItem('token');
 
       const resp = await axios.post(
-        url,
+        `${API_URL}/citizen/citizenFetch`,
         { emailid: email.trim() },
         {
           headers: {
@@ -213,7 +213,7 @@ function CitizenRegistration() {
     setIsAiScanning(true);
     setAiStatusMsg('Evenue GenAI is extracting credentials from ID document...');
 
-    const ocrUrl = 'http://localhost:2005/citizen/citizenExtAdhar';
+    // const ocrUrl = 'http://localhost:2005/citizen/citizenExtAdhar';
     const ocrFormData = new FormData();
 
     if (frontFile) ocrFormData.append('frontpic', frontFile);
@@ -221,7 +221,7 @@ function CitizenRegistration() {
 
     try {
       const token = localStorage.getItem('token');
-      const resp = await axios.post(ocrUrl, ocrFormData, {
+      const resp = await axios.post(`${API_URL}/citizen/citizenExtAdhar`, ocrFormData, {
         headers: {
           authorization: `Bearer ${token}`,
         },
@@ -302,7 +302,7 @@ function CitizenRegistration() {
       if (!proceed) return;
     }
 
-    const url = 'http://localhost:2005/citizen/citizenSave';
+    // const url = 'http://localhost:2005/citizen/citizenSave';
     const citizenPayload = {
       emailid: obj.emailid.trim(),
       acardno: obj.acardno || '',
@@ -317,7 +317,7 @@ function CitizenRegistration() {
     try {
       setIsSubmitting(true);
       const token = localStorage.getItem('token');
-      const resp = await axios.post(url, citizenPayload, {
+      const resp = await axios.post(`${API_URL}/citizen/citizenSave`, citizenPayload, {
         headers: {
           'Content-Type': 'application/json',
           authorization: `Bearer ${token}`,
@@ -359,7 +359,7 @@ function CitizenRegistration() {
       return;
     }
 
-    const url = 'http://localhost:2005/citizen/citizenUpdate';
+    // const url = 'http://localhost:2005/citizen/citizenUpdate';
     const citizenPayload = {
       emailid: obj.emailid.trim(),
       acardno: obj.acardno || '',
@@ -374,7 +374,7 @@ function CitizenRegistration() {
     try {
       setIsSubmitting(true);
       const token = localStorage.getItem('token');
-      const resp = await axios.post(url, citizenPayload, {
+      const resp = await axios.post(`${API_URL}/citizen/citizenUpdate`, citizenPayload, {
         headers: {
           'Content-Type': 'application/json',
           authorization: `Bearer ${token}`,

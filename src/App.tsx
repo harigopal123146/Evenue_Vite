@@ -30,16 +30,15 @@ function App() {
 
       {/* 2. CITIZEN DASHBOARD */}
       <Route path="/citizendash" element={<CitizenDash />}>
-        <Route index element={<Navigate to="profile" replace />} />
-        <Route path="profile" element={<Citizen />} />
+        {/* Form ab alag route 'form' par khulega */}
+        <Route path="form" element={<Citizen />} />
         <Route path="search" element={<Services />} />
         <Route path="favs" element={<Favs />} />
       </Route>
 
       {/* 3. VENDOR DASHBOARD */}
       <Route path="/vendordash" element={<VendorDash />}>
-        <Route index element={<Navigate to="profile" replace />} />
-        <Route path="profile" element={<VendorRegistration />} />
+        {/* Registration form alag route par */}
         <Route path="vendorregistration" element={<VendorRegistration />} />
       </Route>
 

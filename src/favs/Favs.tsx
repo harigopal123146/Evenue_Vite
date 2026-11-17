@@ -2,7 +2,7 @@
 import  { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-
+const API_URL = import.meta.env.VITE_API_URL;
 export interface Vendor {
   _id?: string;
   emailid: string;
@@ -25,7 +25,7 @@ export interface Vendor {
 
 export default function Favs() {
   const navigate = useNavigate();
-  const API_BASE = "http://localhost:2005";
+  // const API_BASE = "http://localhost:2005";
 
   const [email, setEmail] = useState<string>("");
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -105,7 +105,7 @@ export default function Favs() {
     setLoading(true);
 
     try {
-      const resp = await axios.post(`${API_BASE}/favrs/fetchWishlist`, {
+      const resp = await axios.post(`${API_URL}/favrs/fetchWishlist`, {
         citizenEmail: targetEmail.trim(),
       });
 
@@ -160,7 +160,7 @@ export default function Favs() {
       }));
 
       // Send to backend endpoint: /favrs/rating
-      const resp = await axios.post(`${API_BASE}/favrs/rating`, {
+      const resp = await axios.post(`${API_URL}/favrs/rating`, {
         vendorEmail: cleanVendorEmail,
         citizenEmail: email.trim(),
         rating: stars,
@@ -201,7 +201,7 @@ export default function Favs() {
     setRemovingEmail(vendorEmail);
 
     try {
-      const resp = await axios.post(`${API_BASE}/favrs/RemoveFavs`, {
+      const resp = await axios.post(`${API_URL}/favrs/RemoveFavs`, {
         citizenEmail: email.trim(),
         vendorEmail: vendorEmail.trim(),
       });

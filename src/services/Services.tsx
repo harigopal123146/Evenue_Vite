@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
+const API_URL = import.meta.env.VITE_API_URL;
 // Vendor Interface with rating fields
 interface Vendor {
   _id?: string;
@@ -107,8 +107,8 @@ function Services() {
 
   async function doFetchCities() {
     try {
-      const url = "http://localhost:2005/eventss/eventCityFetch";
-      const resp = await axios.post(url);
+      // const url = "http://localhost:2005/eventss/eventCityFetch";
+      const resp = await axios.post(`${API_URL}/eventss/eventCityFetch`);
 
       if (resp.data.status === true && Array.isArray(resp.data.msg)) {
         setCitiesList(resp.data.msg);
@@ -137,10 +137,10 @@ function Services() {
 
     setLoadingServices(true);
     try {
-      const url = "http://localhost:2005/eventss/eventSerFetch";
+      // const url = "http://localhost:2005/eventss/eventSerFetch";
 
       const resp = await axios.post(
-        url,
+        `${API_URL}/eventss/eventSerFetch`,
         { eventOptions: chosenEvent },
         { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
@@ -192,8 +192,8 @@ function Services() {
   async function fetchUserWishlist(email: string) {
     if (!email) return;
     try {
-      const url = "http://localhost:2005/eventss/eventFetchFav";
-      const resp = await axios.post(url, { citizenEmail: email.trim() });
+      // const url = "http://localhost:2005/eventss/eventFetchFav";
+      const resp = await axios.post( `${API_URL}/eventss/eventFetchFav`, { citizenEmail: email.trim() });
 
       if (resp.data.status === true && Array.isArray(resp.data.msg)) {
         setWishlist(resp.data.msg);
@@ -215,9 +215,9 @@ function Services() {
     setWishlistLoading(vendorEmail);
 
     try {
-      const url = "http://localhost:2005/eventss/eventAddtoFav";
+      // const url = "http://localhost:2005/eventss/eventAddtoFav";
 
-      const resp = await axios.post(url, {
+      const resp = await axios.post( `${API_URL}/eventss/eventAddtoFav`, {
         citizenEmail: citizenEmail.trim(),
         vendorEmail: vendorEmail.trim(),
       });
@@ -278,14 +278,14 @@ function Services() {
     }
 
     try {
-      const url = "http://localhost:2005/eventss/eventVendorDetails";
+      // const url = "http://localhost:2005/eventss/eventVendorDetails";
       const payload = {
         event: selectedEvent,
         services: selectedServices,
         city: selectedCity,
       };
 
-      const resp = await axios.post(url, payload);
+      const resp = await axios.post(`${API_URL}/eventss/eventVendorDetails`, payload);
 
       if (resp.data.status === true && Array.isArray(resp.data.msg)) {
         setVendors(resp.data.msg);

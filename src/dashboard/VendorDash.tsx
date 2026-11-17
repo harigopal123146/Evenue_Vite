@@ -1,30 +1,27 @@
-
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function VendorDash() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Logged-in Vendor Information
-  const [vendorEmail, setVendorEmail] = useState<string>("");
+  // Logged-in Vendor Information (Unused vendorEmail state removed)
   const [businessName, setBusinessName] = useState<string>("Vendor Business");
   const [ownerName, setOwnerName] = useState<string>("Registered Vendor");
   const [shopPic, setShopPic] = useState<string>("");
 
-  // Sidebar toggle state (true = expanded, false = collapsed)
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-
   // ----------------------------------------------------
-  // 1. Load Vendor Details & Check Authentication on Mount
+  // 1. Check Authentication & Fetch Vendor Details
   // ----------------------------------------------------
   useEffect(() => {
     let email = localStorage.getItem("vendorEmail");
     const token = localStorage.getItem("token");
 
-    // 🔒 Security Check: If no token or email exists, force redirect to login
-    if (!token || (!email && !localStorage.getItem("evenue_user"))) {
+    // 🔒 Security Check: Redirect to login if not authenticated
+    if (!token && !email && !localStorage.getItem("evenue_user")) {
       navigate("/login", { replace: true });
       return;
     }
@@ -43,32 +40,33 @@ export default function VendorDash() {
 
     if (email) {
       const cleanEmail = email.trim();
-      setVendorEmail(cleanEmail);
 
-      // ✨ Smart Initial Fallback: Email username se clean name banao (e.g. royaldecor -> Royaldecor)
+      // Email se clean fallback name generate karo
       const emailPrefix = cleanEmail.split("@")[0];
       const initialName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
       setOwnerName(initialName);
 
-      // Fetch vendor details from MongoDB
-      axios
-        .post(
-          "http://localhost:2005/vendor/vendorFetch",
-          { emailid: cleanEmail },
-          { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-        )
-        .then((resp) => {
-          if (resp.data.status === true) {
-            const rawData = resp.data.msg;
-            const data = Array.isArray(rawData) ? rawData[0] : rawData || resp.data.doc;
-            if (data) {
-              if (data.business && data.business.trim() !== "") setBusinessName(data.business.trim());
-              if (data.name && data.name.trim() !== "") setOwnerName(data.name.trim());
-              if (data.shoppicurl) setShopPic(data.shoppicurl);
+      // Backend se vendor details fetch karo
+      if (API_URL) {
+        axios
+          .post(
+            `${API_URL}/vendor/vendorFetch`,
+            { emailid: cleanEmail },
+            { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+          )
+          .then((resp) => {
+            if (resp.data.status === true) {
+              const rawData = resp.data.msg;
+              const data = Array.isArray(rawData) ? rawData[0] : rawData || resp.data.doc;
+              if (data) {
+                if (data.business && data.business.trim() !== "") setBusinessName(data.business.trim());
+                if (data.name && data.name.trim() !== "") setOwnerName(data.name.trim());
+                if (data.shoppicurl) setShopPic(data.shoppicurl);
+              }
             }
-          }
-        })
-        .catch((err) => console.log("Vendor profile fetch notice:", err));
+          })
+          .catch((err) => console.log("Vendor profile fetch notice:", err));
+      }
     }
   }, [navigate]);
 
@@ -81,14 +79,13 @@ export default function VendorDash() {
       localStorage.removeItem("token");
       localStorage.removeItem("vendorEmail");
       localStorage.removeItem("evenue_user");
-      
-      alert("Signed out successfully.");
-      navigate("/", { replace: true });
+      navigate("/login", { replace: true });
     }
   }
 
-  // Active route checker
-  const isActive = (path: string) => location.pathname.includes(path);
+  // Active route checking
+  const isFormActive = location.pathname.includes("/vendorregistration");
+  const isWelcomePage = !isFormActive;
 
   // Name to display in Welcome Greeting
   const displayName =
@@ -105,177 +102,223 @@ export default function VendorDash() {
     : "V";
 
   return (
-    <div className="min-h-screen bg-[#FBFBFA] flex flex-col font-sans antialiased text-[#11130F]">
+    <div className="min-h-screen flex bg-[#f4f6f4] font-sans antialiased text-[#11130F]">
       
       {/* ==================================================== */}
-      {/* 1. TOP NAVBAR (WITH PROMINENT WELCOME GREETING)      */}
+      {/* 1. LEFT SIDEBAR (DARK THEME - Evenue.)               */}
       {/* ==================================================== */}
-      <header className="w-full bg-emerald-950 border-b border-emerald-900/60 px-6 py-3.5 shadow-md sticky top-0 z-40 backdrop-blur-md">
-        <div className="flex items-center justify-between">
-          
-          {/* Left: Brand Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-900 border border-emerald-700/60 flex items-center justify-center font-serif italic text-amber-300 text-xl shadow-inner">
-              E
+      <aside className="w-64 bg-[#111c15] text-white flex flex-col justify-between p-5 border-r border-[#1a2b21] shrink-0 min-h-screen">
+        
+        <div>
+          {/* Brand Header */}
+          <div className="mb-6">
+            <h1 className="text-xl font-bold tracking-tight text-white flex items-center">
+              Evenue<span className="text-[#86efac]">.</span>
+            </h1>
+            <p className="text-[10px] font-semibold tracking-wider text-emerald-500/80 uppercase mt-0.5">
+              Vendor Dashboard
+            </p>
+          </div>
+
+          {/* Vendor Profile Mini Card in Sidebar */}
+          <div className="bg-[#17251d] border border-white/5 rounded-2xl p-3.5 mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-base flex items-center justify-center shrink-0 overflow-hidden">
+              {shopPic ? (
+                <img src={shopPic} alt={businessName} className="w-full h-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-white font-serif text-2xl tracking-tight font-bold">
-                  Evenue<span className="text-emerald-400">.</span>
-                </span>
-                <span className="bg-emerald-900/90 text-emerald-200 border border-emerald-700/60 text-[10px] font-semibold px-2.5 py-0.5 rounded-full tracking-wider uppercase">
-                  Vendor Partner
-                </span>
-              </div>
-              <p className="text-emerald-200/70 text-xs hidden sm:block font-light">
-                Professional Event Management & Service Portal
+            <div className="overflow-hidden">
+              <h2 className="text-sm font-semibold text-white truncate capitalize">
+                {businessName}
+              </h2>
+              <p className="text-[11px] text-gray-300 truncate capitalize">
+                Owner: {ownerName}
               </p>
-            </div>
-          </div>
-
-          {/* Center / Right: ✨ PROMINENT "WELCOME [NAME]" GREETING */}
-          <div className="flex items-center gap-3 sm:gap-5">
-            
-            {/* WELCOME BADGE */}
-            <div className="flex items-center gap-2 bg-emerald-900/90 border border-emerald-700/70 px-4 py-1.5 rounded-full shadow-inner">
-              <span className="text-base animate-pulse">👋</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xs font-normal text-emerald-200/90">Welcome,</span>
-                <span className="text-xs sm:text-sm font-bold text-amber-300 tracking-wide capitalize truncate max-w-[150px] sm:max-w-[220px]">
-                  {displayName}!
-                </span>
-              </div>
-            </div>
-
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white text-xs font-semibold rounded-full transition-all duration-200 shadow-sm active:scale-95 cursor-pointer hover:shadow-red-900/20"
-              title="Sign Out"
-            >
-              Sign Out
-            </button>
-          </div>
-
-        </div>
-      </header>
-
-      {/* ==================================================== */}
-      {/* 2. DASHBOARD BODY: SIDEBAR + MAIN OUTLET CONTAINER  */}
-      {/* ==================================================== */}
-      <div className="flex-1 flex overflow-hidden p-4 md:p-6 gap-6">
-
-        {/* LEFT SIDEBAR */}
-        <aside
-          className={`bg-white rounded-3xl border border-gray-200/70 shadow-lg transition-all duration-300 flex flex-col ${
-            isSidebarOpen ? "w-72 p-5" : "w-20 p-3 items-center"
-          }`}
-        >
-          {/* Top Collapse Toggle */}
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 w-full">
-            {isSidebarOpen && (
-              <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                Vendor Console
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium mt-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Verified Partner
               </span>
-            )}
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 rounded-xl bg-gray-100 hover:bg-emerald-950 hover:text-white text-gray-600 transition-colors duration-200 cursor-pointer"
-              title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
-            >
-              <svg
-                className={`w-4 h-4 transform transition-transform duration-200 ${
-                  isSidebarOpen ? "rotate-180" : "rotate-0"
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+            </div>
           </div>
 
-          {/* VENDOR PROFILE CARD */}
-          {isSidebarOpen ? (
-            <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-md relative overflow-hidden group">
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center font-bold text-amber-300 text-base flex-shrink-0 shadow-sm overflow-hidden">
-                  {shopPic ? (
-                    <img src={shopPic} alt={businessName} className="w-full h-full object-cover" />
-                  ) : (
-                    initials
-                  )}
-                </div>
+          {/* Menu Category */}
+          <div className="mb-2">
+            <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+              Workspace
+            </span>
+          </div>
 
-                <div className="overflow-hidden">
-                  <span className="text-sm font-semibold truncate block capitalize">
-                    {businessName}
-                  </span>
-                  <span className="text-[11px] text-emerald-200/90 truncate block capitalize">
-                    Owner: {ownerName}
-                  </span>
-                  <span className="text-[10px] text-emerald-300/80 truncate block font-mono font-light">
-                    {vendorEmail || "vendor@evenue.com"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-emerald-300/80">
-                <span>Vendor Partner</span>
-                <span className="flex items-center gap-1.5 text-emerald-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Verified Business
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div
-              className="mb-4 w-11 h-11 rounded-xl bg-emerald-950 text-amber-300 flex items-center justify-center font-bold text-xs shadow-md overflow-hidden cursor-pointer"
-              title={`${businessName} (${vendorEmail})`}
+          {/* Navigation Items */}
+          <nav className="space-y-1.5">
+            {/* 1. Profile (Opens Welcome Screen) */}
+            <button
+              onClick={() => navigate('/vendordash')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                isWelcomePage
+                  ? "bg-[#86efac] text-[#0f1712] shadow-sm"
+                  : "text-gray-300 hover:text-white hover:bg-white/5"
+              }`}
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>Profile</span>
+            </button>
+
+            {/* 2. Vendor Registration Form */}
+            <button
+              onClick={() => navigate('vendorregistration')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                isFormActive
+                  ? "bg-[#86efac] text-[#0f1712] shadow-sm"
+                  : "text-gray-300 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Vendor Registration</span>
+            </button>
+          </nav>
+        </div>
+
+        {/* Bottom Sign Out Button */}
+        <div className="pt-4 border-t border-white/5">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* ==================================================== */}
+      {/* 2. RIGHT PANEL: TOP BAR + MAIN CONTENT               */}
+      {/* ==================================================== */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
+
+        {/* Top Bar Header */}
+        <header className="px-8 py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              Vendor Workspace
+            </p>
+            <h2 className="text-sm font-semibold text-gray-800">
+              Evenue Vendor Management
+            </h2>
+          </div>
+
+          {/* Right mini profile avatar */}
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-xs font-semibold text-gray-800 capitalize">{displayName}</p>
+              <p className="text-[10px] text-gray-400">Vendor Account</p>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#86efac] text-[#111c15] font-bold text-xs flex items-center justify-center overflow-hidden">
               {shopPic ? (
                 <img src={shopPic} alt="" className="w-full h-full object-cover" />
               ) : (
                 initials
               )}
             </div>
-          )}
-
-          {/* Navigation Menu Buttons */}
-          <nav className="flex-1 space-y-2 w-full">
-            <button
-              onClick={() => navigate("profile")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                isActive("profile") || location.pathname === "/vendordash"
-                  ? "bg-emerald-950 text-amber-300 shadow-md shadow-emerald-950/20"
-                  : "text-gray-600 hover:bg-emerald-50/60 hover:text-emerald-950"
-              }`}
-            >
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              {isSidebarOpen && <span>Business Profile</span>}
-            </button>
-          </nav>
-
-          {/* Bottom Logout Button */}
-          <div className="pt-3 border-t border-gray-100 w-full">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors duration-150 cursor-pointer"
-            >
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              {isSidebarOpen && <span>Sign Out</span>}
-            </button>
           </div>
-        </aside>
+        </header>
 
-        {/* RIGHT MAIN PANEL */}
-        <main className="flex-1 bg-white rounded-3xl border border-gray-200/70 shadow-lg p-6 md:p-8 overflow-y-auto">
-          <Outlet />
+        {/* Main Content Body */}
+        <main className="p-8 flex-1">
+          {isWelcomePage ? (
+            /* ==================================================== */
+            /* 1. PROFILE / WELCOME SCREEN                          */
+            /* ==================================================== */
+            <div className="space-y-8 max-w-6xl">
+              
+              {/* HERO BANNER (Dark Forest Green) */}
+              <div className="relative overflow-hidden rounded-3xl bg-[#143225] text-white p-8 sm:p-10 shadow-sm">
+                
+                {/* Decorative Circular Accent */}
+                <div className="absolute -right-12 -top-12 w-64 h-64 rounded-full border-[18px] border-emerald-800/30 pointer-events-none" />
+
+                <div className="relative z-10 max-w-xl">
+                  {/* Badge */}
+                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-600/40 text-emerald-300 mb-4">
+                    Vendor Dashboard
+                  </span>
+
+                  {/* Heading */}
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2 leading-tight">
+                    Welcome Back,<br />
+                    <span>{displayName}!</span>
+                  </h1>
+
+                  {/* Description */}
+                  <p className="text-emerald-100/75 text-xs sm:text-sm leading-relaxed mb-6 font-normal">
+                    Welcome to Evenue. Manage your event services, update your business registration, and connect with clients for their celebrations.
+                  </p>
+
+                  {/* Action Button: Opens the form */}
+                  <button
+                    onClick={() => navigate('vendorregistration')}
+                    className="inline-flex items-center gap-2 bg-[#86efac] hover:bg-[#6ee7b7] text-[#0f1712] text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer"
+                  >
+                    <span>Open Registration Form</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* QUICK NAVIGATION SECTION (ONLY VENDOR REGISTRATION CARD) */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                  Quick Navigation
+                </p>
+                <h3 className="text-xl font-bold text-gray-900 tracking-tight">
+                  Manage Your Business
+                </h3>
+                <p className="text-xs text-gray-500 mb-5">
+                  Select an option to update or manage your vendor profile.
+                </p>
+
+                {/* ONLY 1 CARD: Vendor Registration */}
+                <div className="max-w-md">
+                  <div
+                    onClick={() => navigate('vendorregistration')}
+                    className="bg-white rounded-2xl border border-gray-200/70 p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-md">
+                        Form
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-gray-900 group-hover:text-emerald-700 transition">
+                      Vendor Registration
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                      Fill or update your business registration details, address, and contact info.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          ) : (
+            /* ==================================================== */
+            /* 2. VENDOR REGISTRATION FORM                          */
+            /* ==================================================== */
+            <div className="bg-white rounded-2xl border border-gray-200/70 p-6 shadow-sm">
+              <Outlet />
+            </div>
+          )}
         </main>
 
       </div>
