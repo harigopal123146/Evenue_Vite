@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface LoginState {
   emailid: string;
   password: string;
@@ -105,14 +105,14 @@ function Login() {
       setLoading(true);
       setErrors({});
 
-      const url = 'http://localhost:2005/user/login';
+      // const url = 'http://localhost:2005/user/login';
       const cleanEmail = obj.emailid.trim().toLowerCase();
       const payload = {
         emailid: cleanEmail,
         password: obj.password,
       };
 
-      const resp = await axios.post(url, payload);
+      const resp = await axios.post(`${API_URL}/user/login`, payload);
 
       // 🟢 1. LOGIN SUCCESSFUL
       if (resp.data.status === true) {
@@ -196,7 +196,7 @@ function Login() {
     try {
       setLoading(true);
       setForgotMessage(null);
-      const resp = await axios.post('http://localhost:2005/user/forgot-password', {
+      const resp = await axios.post(`${API_URL}/user/forgot-password`, {
         emailid: targetEmail.trim().toLowerCase(),
       });
       
@@ -227,7 +227,7 @@ function Login() {
     try {
       setLoading(true);
       setForgotMessage(null);
-      const resp = await axios.post('http://localhost:2005/user/reset-password', {
+      const resp = await axios.post(`${API_URL}/user/reset-password`, {
         emailid: (forgotEmail || obj.emailid).trim().toLowerCase(),
         otp: otp.trim(),
         newPassword: newPassword,
