@@ -8,10 +8,13 @@ export default function VendorDash() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Logged-in Vendor Information (Unused vendorEmail state removed)
+  // Logged-in Vendor Information
   const [businessName, setBusinessName] = useState<string>("Vendor Business");
   const [ownerName, setOwnerName] = useState<string>("Registered Vendor");
   const [shopPic, setShopPic] = useState<string>("");
+
+  // 👉 Sidebar Slide Toggle State (true = Open, false = Closed/Slide)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   // ----------------------------------------------------
   // 1. Check Authentication & Fetch Vendor Details
@@ -105,95 +108,149 @@ export default function VendorDash() {
     <div className="min-h-screen flex bg-[#f4f6f4] font-sans antialiased text-[#11130F]">
       
       {/* ==================================================== */}
-      {/* 1. LEFT SIDEBAR (DARK THEME - Evenue.)               */}
+      {/* 1. LEFT SIDEBAR (SLIDE TOGGLE ENABLED)               */}
       {/* ==================================================== */}
-      <aside className="w-64 bg-[#111c15] text-white flex flex-col justify-between p-5 border-r border-[#1a2b21] shrink-0 min-h-screen">
-        
-        <div>
-          {/* Brand Header */}
-          <div className="mb-6">
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center">
-              Evenue<span className="text-[#86efac]">.</span>
-            </h1>
-            <p className="text-[10px] font-semibold tracking-wider text-emerald-500/80 uppercase mt-0.5">
-              Vendor Dashboard
-            </p>
+      <aside
+        className={`bg-[#111c15] text-white flex flex-col justify-between border-r border-[#1a2b21] shrink-0 min-h-screen transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? "w-64 p-5" : "w-20 p-3 items-center"
+        }`}
+      >
+        <div className="w-full">
+          {/* Top Row: Brand & Side Slide Button */}
+          <div className="flex items-center justify-between mb-6 pb-2 border-b border-white/5">
+            {isSidebarOpen ? (
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-white flex items-center">
+                  Evenue<span className="text-[#86efac]">.</span>
+                </h1>
+                <p className="text-[10px] font-semibold tracking-wider text-emerald-500/80 uppercase mt-0.5">
+                  Vendor Dashboard
+                </p>
+              </div>
+            ) : (
+              <span className="font-bold text-lg text-white mx-auto">
+                E<span className="text-[#86efac]">.</span>
+              </span>
+            )}
+
+            {/* 👉 Side Slide Button (Collapse/Expand Arrow) */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-[#86efac] hover:text-[#111c15] text-gray-300 transition-colors cursor-pointer"
+              title={isSidebarOpen ? "Slide Close Sidebar" : "Slide Open Sidebar"}
+            >
+              <svg
+                className={`w-4 h-4 transform transition-transform duration-300 ${
+                  isSidebarOpen ? "rotate-0" : "rotate-180"
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
           </div>
 
           {/* Vendor Profile Mini Card in Sidebar */}
-          <div className="bg-[#17251d] border border-white/5 rounded-2xl p-3.5 mb-6 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-base flex items-center justify-center shrink-0 overflow-hidden">
+          {isSidebarOpen ? (
+            <div className="bg-[#17251d] border border-white/5 rounded-2xl p-3.5 mb-6 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-base flex items-center justify-center shrink-0 overflow-hidden">
+                {shopPic ? (
+                  <img src={shopPic} alt={businessName} className="w-full h-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="overflow-hidden">
+                <h2 className="text-sm font-semibold text-white truncate capitalize">
+                  {businessName}
+                </h2>
+                <p className="text-[11px] text-gray-300 truncate capitalize">
+                  Owner: {ownerName}
+                </p>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Verified Partner
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* Collapsed Profile Icon */
+            <div
+              className="mb-6 w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-sm flex items-center justify-center overflow-hidden mx-auto shadow-sm"
+              title={`${businessName} (${ownerName})`}
+            >
               {shopPic ? (
-                <img src={shopPic} alt={businessName} className="w-full h-full object-cover" />
+                <img src={shopPic} alt="" className="w-full h-full object-cover" />
               ) : (
                 initials
               )}
             </div>
-            <div className="overflow-hidden">
-              <h2 className="text-sm font-semibold text-white truncate capitalize">
-                {businessName}
-              </h2>
-              <p className="text-[11px] text-gray-300 truncate capitalize">
-                Owner: {ownerName}
-              </p>
-              <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                Verified Partner
-              </span>
-            </div>
-          </div>
+          )}
 
           {/* Menu Category */}
-          <div className="mb-2">
-            <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-              Workspace
-            </span>
-          </div>
+          {isSidebarOpen && (
+            <div className="mb-2">
+              <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                Workspace
+              </span>
+            </div>
+          )}
 
           {/* Navigation Items */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-1.5 w-full">
             {/* 1. Profile (Opens Welcome Screen) */}
             <button
               onClick={() => navigate('/vendordash')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                !isSidebarOpen && "justify-center px-2"
+              } ${
                 isWelcomePage
                   ? "bg-[#86efac] text-[#0f1712] shadow-sm"
                   : "text-gray-300 hover:text-white hover:bg-white/5"
               }`}
+              title="Profile"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <span>Profile</span>
+              {isSidebarOpen && <span>Profile</span>}
             </button>
 
             {/* 2. Vendor Registration Form */}
             <button
               onClick={() => navigate('vendorregistration')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                !isSidebarOpen && "justify-center px-2"
+              } ${
                 isFormActive
                   ? "bg-[#86efac] text-[#0f1712] shadow-sm"
                   : "text-gray-300 hover:text-white hover:bg-white/5"
               }`}
+              title="Vendor Registration"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span>Vendor Registration</span>
+              {isSidebarOpen && <span>Vendor Registration</span>}
             </button>
           </nav>
         </div>
 
         {/* Bottom Sign Out Button */}
-        <div className="pt-4 border-t border-white/5">
+        <div className="pt-4 border-t border-white/5 w-full">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer ${
+              !isSidebarOpen && "justify-center px-1"
+            }`}
+            title="Sign Out"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            <span>Sign Out</span>
+            {isSidebarOpen && <span>Sign Out</span>}
           </button>
         </div>
       </aside>
@@ -203,15 +260,28 @@ export default function VendorDash() {
       {/* ==================================================== */}
       <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
 
-        {/* Top Bar Header */}
-        <header className="px-8 py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-              Vendor Workspace
-            </p>
-            <h2 className="text-sm font-semibold text-gray-800">
-              Evenue Vendor Management
-            </h2>
+        {/* Top Bar Header with Hamburger Slide Button */}
+        <header className="px-6 py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* 👉 Top Header Slide Hamburger Button */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 rounded-xl bg-gray-100 hover:bg-emerald-950 hover:text-white text-gray-700 transition cursor-pointer"
+              title="Toggle Sidebar Slide"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                Vendor Workspace
+              </p>
+              <h2 className="text-sm font-semibold text-gray-800">
+                Evenue Vendor Management
+              </h2>
+            </div>
           </div>
 
           {/* Right mini profile avatar */}
@@ -272,7 +342,7 @@ export default function VendorDash() {
                 </div>
               </div>
 
-              {/* QUICK NAVIGATION SECTION (ONLY VENDOR REGISTRATION CARD) */}
+              {/* QUICK NAVIGATION SECTION */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
                   Quick Navigation

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
@@ -12,6 +11,9 @@ export default function CitizenDash() {
   // Logged-in citizen state
   const [userEmail, setUserEmail] = useState<string>('kori@gmail.com');
   const [userName, setUserName] = useState<string>('Citizen');
+
+  // 👉 Sidebar Slide Toggle State (true = Open, false = Closed/Slide)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   // Load active citizen email, check authentication & fetch details
   useEffect(() => {
@@ -92,121 +94,177 @@ export default function CitizenDash() {
     <div className="min-h-screen flex bg-[#f4f6f4] font-sans antialiased text-[#11130F]">
 
       {/* ==================================================== */}
-      {/* 1. LEFT SIDEBAR (DARK THEME - Evenue.)               */}
+      {/* 1. LEFT SIDEBAR (SLIDE TOGGLE ENABLED)               */}
       {/* ==================================================== */}
-      <aside className="w-64 bg-[#111c15] text-white flex flex-col justify-between p-5 border-r border-[#1a2b21] shrink-0 min-h-screen">
-        
-        <div>
-          {/* Logo / Brand Header */}
-          <div className="mb-6">
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center">
-              Evenue<span className="text-[#86efac]">.</span>
-            </h1>
-            <p className="text-[10px] font-semibold tracking-wider text-emerald-500/80 uppercase mt-0.5">
-              Citizen Dashboard
-            </p>
+      <aside
+        className={`bg-[#111c15] text-white flex flex-col justify-between border-r border-[#1a2b21] shrink-0 min-h-screen transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? "w-64 p-5" : "w-20 p-3 items-center"
+        }`}
+      >
+        <div className="w-full">
+          {/* Top Row: Brand & Side Slide Button */}
+          <div className="flex items-center justify-between mb-6 pb-2 border-b border-white/5">
+            {isSidebarOpen ? (
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-white flex items-center">
+                  Evenue<span className="text-[#86efac]">.</span>
+                </h1>
+                <p className="text-[10px] font-semibold tracking-wider text-emerald-500/80 uppercase mt-0.5">
+                  Citizen Dashboard
+                </p>
+              </div>
+            ) : (
+              <span className="font-bold text-lg text-white mx-auto">
+                E<span className="text-[#86efac]">.</span>
+              </span>
+            )}
+
+            {/* 👉 Side Slide Button (Collapse/Expand Arrow) */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-[#86efac] hover:text-[#111c15] text-gray-300 transition-colors cursor-pointer"
+              title={isSidebarOpen ? "Slide Close Sidebar" : "Slide Open Sidebar"}
+            >
+              <svg
+                className={`w-4 h-4 transform transition-transform duration-300 ${
+                  isSidebarOpen ? "rotate-0" : "rotate-180"
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
           </div>
 
           {/* User Profile Mini Card in Sidebar */}
-          <div className="bg-[#17251d] border border-white/5 rounded-2xl p-3.5 mb-6 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-base flex items-center justify-center shrink-0">
+          {isSidebarOpen ? (
+            <div className="bg-[#17251d] border border-white/5 rounded-2xl p-3.5 mb-6 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-base flex items-center justify-center shrink-0">
+                {initialLetter}
+              </div>
+              <div className="overflow-hidden">
+                <h2 className="text-sm font-semibold text-white truncate capitalize">
+                  {userName}
+                </h2>
+                <p className="text-xs text-gray-400 truncate font-mono">
+                  {userEmail}
+                </p>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Active
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* Collapsed Profile Icon */
+            <div
+              className="mb-6 w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-sm flex items-center justify-center mx-auto shadow-sm"
+              title={`${userName} (${userEmail})`}
+            >
               {initialLetter}
             </div>
-            <div className="overflow-hidden">
-              <h2 className="text-sm font-semibold text-white truncate capitalize">
-                {userName}
-              </h2>
-              <p className="text-xs text-gray-400 truncate font-mono">
-                {userEmail}
-              </p>
-              <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                Active
-              </span>
-            </div>
-          </div>
+          )}
 
           {/* Menu Category */}
-          <div className="mb-2">
-            <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-              Workspace
-            </span>
-          </div>
+          {isSidebarOpen && (
+            <div className="mb-2">
+              <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                Workspace
+              </span>
+            </div>
+          )}
 
           {/* Navigation Items */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-1.5 w-full">
             {/* 1. Profile (Opens Welcome Screen) */}
             <button
               onClick={() => navigate('/citizendash')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                !isSidebarOpen && "justify-center px-2"
+              } ${
                 isWelcomePage
                   ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
                   : 'text-gray-300 hover:text-white hover:bg-white/5'
               }`}
+              title="Profile"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm-1-13h2v6h-2zm0 8h2v2h-2z" />
               </svg>
-              <span>Profile</span>
+              {isSidebarOpen && <span>Profile</span>}
             </button>
 
             {/* 2. Search Vendors */}
             <button
               onClick={() => navigate('search')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                !isSidebarOpen && "justify-center px-2"
+              } ${
                 isSearchActive
                   ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
                   : 'text-gray-300 hover:text-white hover:bg-white/5'
               }`}
+              title="Search Vendors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <span>Search Vendors</span>
+              {isSidebarOpen && <span>Search Vendors</span>}
             </button>
 
             {/* 3. My Favourites */}
             <button
               onClick={() => navigate('favs')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                !isSidebarOpen && "justify-center px-2"
+              } ${
                 isFavsActive
                   ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
                   : 'text-gray-300 hover:text-white hover:bg-white/5'
               }`}
+              title="My Favourites"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
-              <span>My Favourites</span>
+              {isSidebarOpen && <span>My Favourites</span>}
             </button>
 
             {/* 4. Citizen Form */}
             <button
               onClick={() => navigate('form')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                !isSidebarOpen && "justify-center px-2"
+              } ${
                 isFormActive
                   ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
                   : 'text-gray-300 hover:text-white hover:bg-white/5'
               }`}
+              title="Citizen Form"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span>Citizen Form</span>
+              {isSidebarOpen && <span>Citizen Form</span>}
             </button>
           </nav>
         </div>
 
         {/* Bottom Sign Out Button */}
-        <div className="pt-4 border-t border-white/5">
+        <div className="pt-4 border-t border-white/5 w-full">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer ${
+              !isSidebarOpen && "justify-center px-1"
+            }`}
+            title="Sign Out"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            <span>Sign Out</span>
+            {isSidebarOpen && <span>Sign Out</span>}
           </button>
         </div>
       </aside>
@@ -216,15 +274,28 @@ export default function CitizenDash() {
       {/* ==================================================== */}
       <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
 
-        {/* Top Bar Header */}
-        <header className="px-8 py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-              Citizen Workspace
-            </p>
-            <h2 className="text-sm font-semibold text-gray-800">
-              Evenue Event Management
-            </h2>
+        {/* Top Bar Header with Hamburger Slide Button */}
+        <header className="px-6 py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* 👉 Top Header Slide Hamburger Button */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 rounded-xl bg-gray-100 hover:bg-emerald-950 hover:text-white text-gray-700 transition cursor-pointer"
+              title="Toggle Sidebar Slide"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                Citizen Workspace
+              </p>
+              <h2 className="text-sm font-semibold text-gray-800">
+                Evenue Event Management
+              </h2>
+            </div>
           </div>
 
           {/* Right mini profile avatar */}
@@ -342,7 +413,7 @@ export default function CitizenDash() {
                     </p>
                   </div>
 
-                  {/* Card 3: Citizen Form (Opens Citizen Form page) */}
+                  {/* Card 3: Citizen Form */}
                   <div
                     onClick={() => navigate('form')}
                     className="bg-white rounded-2xl border border-gray-200/70 p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group"
