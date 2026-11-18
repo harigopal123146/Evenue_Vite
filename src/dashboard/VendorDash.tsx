@@ -13,8 +13,10 @@ export default function VendorDash() {
   const [ownerName, setOwnerName] = useState<string>("Registered Vendor");
   const [shopPic, setShopPic] = useState<string>("");
 
-  // 👉 Sidebar Slide Toggle State (true = Open, false = Closed/Slide)
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  // 👉 Sidebar State: Desktop par default Open (true), Mobile par default Closed (false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    return window.innerWidth >= 768;
+  });
 
   // ----------------------------------------------------
   // 1. Check Authentication & Fetch Vendor Details
@@ -73,12 +75,23 @@ export default function VendorDash() {
     }
   }, [navigate]);
 
+  // Mobile-friendly navigation helper: page change hone par mobile sidebar auto-close ho jaye
+  function handleNavigation(path: string) {
+    navigate(path);
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }
+
   // ----------------------------------------------------
   // 2. Logout Handler
   // ----------------------------------------------------
   function handleLogout() {
     const confirmLogout = window.confirm("Are you sure you want to sign out from Evenue Vendor Portal?");
     if (confirmLogout) {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
       localStorage.removeItem("token");
       localStorage.removeItem("vendorEmail");
       localStorage.removeItem("evenue_user");
@@ -105,15 +118,31 @@ export default function VendorDash() {
     : "V";
 
   return (
-    <div className="min-h-screen flex bg-[#f4f6f4] font-sans antialiased text-[#11130F]">
+    <div className="min-h-screen flex bg-[#f4f6f4] font-sans antialiased text-[#11130F] relative">
       
       {/* ==================================================== */}
-      {/* 1. LEFT SIDEBAR (SLIDE TOGGLE ENABLED)               */}
+      {/* 0. MOBILE BACKDROP (Overlay click se sidebar band ho) */}
+      {/* ==================================================== */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ==================================================== */}
+      {/* 1. LEFT SIDEBAR (RESPONSIVE: FIXED ON MOBILE, STATIC ON DESKTOP) */}
       {/* ==================================================== */}
       <aside
-        className={`bg-[#111c15] text-white flex flex-col justify-between border-r border-[#1a2b21] shrink-0 min-h-screen transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? "w-64 p-5" : "w-20 p-3 items-center"
-        }`}
+        className={`bg-[#111c15] text-white flex flex-col justify-between border-r border-[#1a2b21] shrink-0 min-h-screen transition-all duration-300 ease-in-out overflow-y-auto
+          fixed inset-y-0 left-0 z-50 md:static
+          ${
+            isSidebarOpen
+              ? "w-64 p-5 translate-x-0"
+              : "-translate-x-full md:translate-x-0 md:w-20 md:p-3 md:items-center"
+          }
+        `}
       >
         <div className="w-full">
           {/* Top Row: Brand & Side Slide Button */}
@@ -133,11 +162,11 @@ export default function VendorDash() {
               </span>
             )}
 
-            {/* 👉 Side Slide Button (Collapse/Expand Arrow) */}
+            {/* 👉 Toggle Button (Desktop par collapse, Mobile par close) */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-1.5 rounded-xl bg-white/5 hover:bg-[#86efac] hover:text-[#111c15] text-gray-300 transition-colors cursor-pointer"
-              title={isSidebarOpen ? "Slide Close Sidebar" : "Slide Open Sidebar"}
+              title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
             >
               <svg
                 className={`w-4 h-4 transform transition-transform duration-300 ${
@@ -176,7 +205,7 @@ export default function VendorDash() {
               </div>
             </div>
           ) : (
-            /* Collapsed Profile Icon */
+            /* Collapsed Profile Icon (Desktop Only) */
             <div
               className="mb-6 w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-sm flex items-center justify-center overflow-hidden mx-auto shadow-sm"
               title={`${businessName} (${ownerName})`}
@@ -200,11 +229,11 @@ export default function VendorDash() {
 
           {/* Navigation Items */}
           <nav className="space-y-1.5 w-full">
-            {/* 1. Profile (Opens Welcome Screen) */}
+            {/* 1. Profile */}
             <button
-              onClick={() => navigate('/vendordash')}
+              onClick={() => handleNavigation('/vendordash')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                !isSidebarOpen && "justify-center px-2"
+                !isSidebarOpen && "md:justify-center md:px-2"
               } ${
                 isWelcomePage
                   ? "bg-[#86efac] text-[#0f1712] shadow-sm"
@@ -220,9 +249,9 @@ export default function VendorDash() {
 
             {/* 2. Vendor Registration Form */}
             <button
-              onClick={() => navigate('vendorregistration')}
+              onClick={() => handleNavigation('vendorregistration')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                !isSidebarOpen && "justify-center px-2"
+                !isSidebarOpen && "md:justify-center md:px-2"
               } ${
                 isFormActive
                   ? "bg-[#86efac] text-[#0f1712] shadow-sm"
@@ -239,11 +268,11 @@ export default function VendorDash() {
         </div>
 
         {/* Bottom Sign Out Button */}
-        <div className="pt-4 border-t border-white/5 w-full">
+        <div className="pt-4 pb-2 border-t border-white/5 w-full">
           <button
             onClick={handleLogout}
             className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer ${
-              !isSidebarOpen && "justify-center px-1"
+              !isSidebarOpen && "md:justify-center md:px-1"
             }`}
             title="Sign Out"
           >
@@ -258,16 +287,16 @@ export default function VendorDash() {
       {/* ==================================================== */}
       {/* 2. RIGHT PANEL: TOP BAR + MAIN CONTENT               */}
       {/* ==================================================== */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
+      <div className="flex-1 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
 
-        {/* Top Bar Header with Hamburger Slide Button */}
-        <header className="px-6 py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* 👉 Top Header Slide Hamburger Button */}
+        {/* Top Bar Header with Hamburger Button */}
+        <header className="px-4 sm:px-6 py-3 sm:py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* 👉 Hamburger Button (Opens/Closes Sidebar) */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 rounded-xl bg-gray-100 hover:bg-emerald-950 hover:text-white text-gray-700 transition cursor-pointer"
-              title="Toggle Sidebar Slide"
+              title="Toggle Menu"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -275,22 +304,22 @@ export default function VendorDash() {
             </button>
 
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400">
                 Vendor Workspace
               </p>
-              <h2 className="text-sm font-semibold text-gray-800">
+              <h2 className="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-[170px] sm:max-w-none">
                 Evenue Vendor Management
               </h2>
             </div>
           </div>
 
           {/* Right mini profile avatar */}
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-xs font-semibold text-gray-800 capitalize">{displayName}</p>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-semibold text-gray-800 capitalize max-w-[120px] truncate">{displayName}</p>
               <p className="text-[10px] text-gray-400">Vendor Account</p>
             </div>
-            <div className="w-8 h-8 rounded-full bg-[#86efac] text-[#111c15] font-bold text-xs flex items-center justify-center overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-[#86efac] text-[#111c15] font-bold text-xs flex items-center justify-center overflow-hidden shrink-0">
               {shopPic ? (
                 <img src={shopPic} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -301,29 +330,29 @@ export default function VendorDash() {
         </header>
 
         {/* Main Content Body */}
-        <main className="p-8 flex-1">
+        <main className="p-4 sm:p-6 lg:p-8 flex-1">
           {isWelcomePage ? (
             /* ==================================================== */
             /* 1. PROFILE / WELCOME SCREEN                          */
             /* ==================================================== */
-            <div className="space-y-8 max-w-6xl">
+            <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto">
               
               {/* HERO BANNER (Dark Forest Green) */}
-              <div className="relative overflow-hidden rounded-3xl bg-[#143225] text-white p-8 sm:p-10 shadow-sm">
+              <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#143225] text-white p-6 sm:p-10 shadow-sm">
                 
                 {/* Decorative Circular Accent */}
-                <div className="absolute -right-12 -top-12 w-64 h-64 rounded-full border-[18px] border-emerald-800/30 pointer-events-none" />
+                <div className="absolute -right-12 -top-12 w-48 h-48 sm:w-64 sm:h-64 rounded-full border-[14px] sm:border-[18px] border-emerald-800/30 pointer-events-none" />
 
                 <div className="relative z-10 max-w-xl">
                   {/* Badge */}
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-600/40 text-emerald-300 mb-4">
+                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-600/40 text-emerald-300 mb-3 sm:mb-4">
                     Vendor Dashboard
                   </span>
 
                   {/* Heading */}
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2 leading-tight">
+                  <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white mb-2 leading-tight">
                     Welcome Back,<br />
-                    <span>{displayName}!</span>
+                    <span className="break-all text-[#86efac]">{displayName}!</span>
                   </h1>
 
                   {/* Description */}
@@ -333,8 +362,8 @@ export default function VendorDash() {
 
                   {/* Action Button: Opens the form */}
                   <button
-                    onClick={() => navigate('vendorregistration')}
-                    className="inline-flex items-center gap-2 bg-[#86efac] hover:bg-[#6ee7b7] text-[#0f1712] text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer"
+                    onClick={() => handleNavigation('vendorregistration')}
+                    className="inline-flex items-center gap-2 bg-[#86efac] hover:bg-[#6ee7b7] text-[#0f1712] text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer active:scale-95"
                   >
                     <span>Open Registration Form</span>
                     <span>→</span>
@@ -347,18 +376,18 @@ export default function VendorDash() {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
                   Quick Navigation
                 </p>
-                <h3 className="text-xl font-bold text-gray-900 tracking-tight">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">
                   Manage Your Business
                 </h3>
-                <p className="text-xs text-gray-500 mb-5">
+                <p className="text-xs text-gray-500 mb-4 sm:mb-5">
                   Select an option to update or manage your vendor profile.
                 </p>
 
-                {/* ONLY 1 CARD: Vendor Registration */}
+                {/* 1 CARD: Vendor Registration */}
                 <div className="max-w-md">
                   <div
-                    onClick={() => navigate('vendorregistration')}
-                    className="bg-white rounded-2xl border border-gray-200/70 p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group"
+                    onClick={() => handleNavigation('vendorregistration')}
+                    className="bg-white rounded-2xl border border-gray-200/70 p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group active:scale-[0.99]"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -385,7 +414,7 @@ export default function VendorDash() {
             /* ==================================================== */
             /* 2. VENDOR REGISTRATION FORM                          */
             /* ==================================================== */
-            <div className="bg-white rounded-2xl border border-gray-200/70 p-6 shadow-sm">
+            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200/70 p-4 sm:p-6 shadow-sm overflow-x-auto">
               <Outlet />
             </div>
           )}
