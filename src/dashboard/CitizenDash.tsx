@@ -1,126 +1,104 @@
+import { useState, useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 
-import { useState, useEffect } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:2005";
 
 export default function CitizenDash() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Logged-in citizen state
-  const [userEmail, setUserEmail] = useState<string>('kori@gmail.com');
-  const [userName, setUserName] = useState<string>('Citizen');
+  // ----------------------------------------------------
+  // 1. STATE VARIABLES
+  // ----------------------------------------------------
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [userName, setUserName] = useState<string>("Citizen");
 
-  // 👉 Sidebar State: Desktop par default Open (true), Mobile par default Closed (false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
-    return window.innerWidth >= 768;
-  });
+  // Sidebar Open / Close state (Desktop par open, Mobile par band)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(window.innerWidth >= 768);
 
-  // Load active citizen email, check authentication & fetch details
+  // ----------------------------------------------------
+  // 2. CHECK LOGIN & FETCH CITIZEN NAME
+  // ----------------------------------------------------
   useEffect(() => {
-    let email = localStorage.getItem('citizenEmail');
-    const token = localStorage.getItem('token');
+    // LocalStorage se login data read karna
+    const email = localStorage.getItem("citizenEmail");
+    const token = localStorage.getItem("token");
 
-    // 🔒 Security Check: Agar token ya user data na ho to login par redirect karo
-    if (!token && !email && !localStorage.getItem('evenue_user')) {
-      navigate('/login', { replace: true });
+    // Agar token ya email nahi hai, to login page par bhej do
+    if (!token && !email) {
+      navigate("/login", { replace: true });
       return;
     }
 
-    if (!email) {
-      const storedUser = localStorage.getItem('evenue_user');
-      if (storedUser) {
-        try {
-          const parsed = JSON.parse(storedUser);
-          email = parsed.emailid;
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
     if (email) {
-      const cleanEmail = email.trim();
-      setUserEmail(cleanEmail);
+      setUserEmail(email);
 
-      // Email prefix se first name banao (e.g. kori@gmail.com -> Kori)
-      const prefix = cleanEmail.split('@')[0];
-      setUserName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
-
-      // Backend se registered Real Name fetch karo
-      if (API_URL) {
-        axios
-          .post(
-            `${API_URL}/citizen/citizenFetch`,
-            { emailid: cleanEmail },
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-          )
-          .then((resp) => {
-            if (resp.data.status === true) {
-              const rawData = resp.data.msg;
-              const data = Array.isArray(rawData) ? rawData[0] : rawData || resp.data.doc;
-              if (data && data.name && data.name.trim() !== '') {
-                setUserName(data.name.trim());
-              }
-            }
-          })
-          .catch((err) => console.log('Citizen name fetch fallback:', err));
-      }
+      // Backend se citizen ka real name fetch karna
+      axios
+        .post(
+          `${API_URL}/citizen/citizenFetch`,
+          { emailid: email },
+          { headers: { authorization: `Bearer ${token}` } }
+        )
+        .then((resp) => {
+          if (resp.data.status === true && resp.data.msg) {
+            let data = resp.data.msg;
+            if (Array.isArray(data)) data = data[0];
+            if (data.name) setUserName(data.name);
+          }
+        })
+        .catch(() => console.log("Name fetch fallback"));
     }
   }, [navigate]);
 
-  // Mobile-friendly navigation helper: page change hone par mobile sidebar auto-close ho jaye
+  // ----------------------------------------------------
+  // 3. NAVIGATION & LOGOUT HANDLERS
+  // ----------------------------------------------------
   function handleNavigation(path: string) {
     navigate(path);
+    // Mobile screen par page click hote hi sidebar band ho jaye
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
   }
 
-  // Logout handler
   function handleLogout() {
-    const confirmLogout = window.confirm('Are you sure you want to logout from Evenue?');
-    if (confirmLogout) {
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-      }
-      localStorage.removeItem('token');
-      localStorage.removeItem('citizenEmail');
-      localStorage.removeItem('evenue_user');
-      navigate('/login', { replace: true });
+    const isConfirm = window.confirm("Are you sure you want to logout from Evenue?");
+    if (isConfirm) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("citizenEmail");
+      localStorage.removeItem("evenue_user");
+      navigate("/login", { replace: true });
     }
   }
 
-  // Active route check helpers
-  const isSearchActive = location.pathname.includes('/search');
-  const isFavsActive = location.pathname.includes('/favs');
-  const isFormActive = location.pathname.includes('/form');
+  // Active page identify karne ke liye
+  const isSearchActive = location.pathname.includes("/search");
+  const isFavsActive = location.pathname.includes("/favs");
+  const isFormActive = location.pathname.includes("/form");
 
-  // Check agar user Home/Profile screen par hai (Welcome banner dikhane ke liye)
+  // Agar user home dashboard par hai to welcome banner dikhao
   const isWelcomePage = !isSearchActive && !isFavsActive && !isFormActive;
 
-  // Avatar icon letter (e.g., 'K' ya 'E')
-  const initialLetter = (userEmail ? userEmail[0] : userName[0] || 'C').toUpperCase();
+  // Profile icon letter (e.g., 'K' ya 'C')
+  const initialLetter = (userEmail ? userEmail[0] : userName[0] || "C").toUpperCase();
 
+  // ----------------------------------------------------
+  // 4. EXACT SAME USER INTERFACE (UI)
+  // ----------------------------------------------------
   return (
     <div className="min-h-screen flex bg-[#f4f6f4] font-sans antialiased text-[#11130F] relative">
 
-      {/* ==================================================== */}
-      {/* 0. MOBILE BACKDROP (Overlay click se sidebar band ho) */}
-      {/* ==================================================== */}
+      {/* ================= 0. MOBILE BACKDROP OVERLAY ================= */}
       {isSidebarOpen && (
         <div
           onClick={() => setIsSidebarOpen(false)}
           className="fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity"
-          aria-hidden="true"
         />
       )}
 
-      {/* ==================================================== */}
-      {/* 1. LEFT SIDEBAR (RESPONSIVE: FIXED ON MOBILE, STATIC ON DESKTOP) */}
-      {/* ==================================================== */}
+      {/* ================= 1. LEFT SIDEBAR ================= */}
       <aside
         className={`bg-[#111c15] text-white flex flex-col justify-between border-r border-[#1a2b21] shrink-0 min-h-screen transition-all duration-300 ease-in-out overflow-y-auto
           fixed inset-y-0 left-0 z-50 md:static
@@ -132,7 +110,7 @@ export default function CitizenDash() {
         `}
       >
         <div className="w-full">
-          {/* Top Row: Brand & Close/Slide Button */}
+          {/* Top Brand & Toggle Button */}
           <div className="flex items-center justify-between mb-6 pb-2 border-b border-white/5">
             {isSidebarOpen ? (
               <div>
@@ -149,7 +127,7 @@ export default function CitizenDash() {
               </span>
             )}
 
-            {/* 👉 Toggle Button (Desktop par collapse, Mobile par close) */}
+            {/* Sidebar Toggle Button */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-1.5 rounded-xl bg-white/5 hover:bg-[#86efac] hover:text-[#111c15] text-gray-300 transition-colors cursor-pointer"
@@ -168,7 +146,7 @@ export default function CitizenDash() {
             </button>
           </div>
 
-          {/* User Profile Mini Card in Sidebar */}
+          {/* User Mini Profile Card */}
           {isSidebarOpen ? (
             <div className="bg-[#17251d] border border-white/5 rounded-2xl p-3.5 mb-6 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-base flex items-center justify-center shrink-0">
@@ -188,7 +166,6 @@ export default function CitizenDash() {
               </div>
             </div>
           ) : (
-            /* Collapsed Profile Icon (Desktop Only) */
             <div
               className="mb-6 w-10 h-10 rounded-xl bg-[#86efac] text-[#111c15] font-bold text-sm flex items-center justify-center mx-auto shadow-sm"
               title={`${userName} (${userEmail})`}
@@ -197,7 +174,7 @@ export default function CitizenDash() {
             </div>
           )}
 
-          {/* Menu Category */}
+          {/* Menu Title */}
           {isSidebarOpen && (
             <div className="mb-2">
               <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
@@ -206,19 +183,18 @@ export default function CitizenDash() {
             </div>
           )}
 
-          {/* Navigation Items */}
+          {/* Navigation Links */}
           <nav className="space-y-1.5 w-full">
-            {/* 1. Profile */}
+            {/* 1. Profile / Home */}
             <button
-              onClick={() => handleNavigation('/citizendash')}
+              onClick={() => handleNavigation("/citizendash")}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 !isSidebarOpen && "md:justify-center md:px-2"
               } ${
                 isWelcomePage
-                  ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
-                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  ? "bg-[#86efac] text-[#0f1712] shadow-sm"
+                  : "text-gray-300 hover:text-white hover:bg-white/5"
               }`}
-              title="Profile"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm-1-13h2v6h-2zm0 8h2v2h-2z" />
@@ -228,15 +204,14 @@ export default function CitizenDash() {
 
             {/* 2. Search Vendors */}
             <button
-              onClick={() => handleNavigation('search')}
+              onClick={() => handleNavigation("search")}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 !isSidebarOpen && "md:justify-center md:px-2"
               } ${
                 isSearchActive
-                  ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
-                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  ? "bg-[#86efac] text-[#0f1712] shadow-sm"
+                  : "text-gray-300 hover:text-white hover:bg-white/5"
               }`}
-              title="Search Vendors"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -246,15 +221,14 @@ export default function CitizenDash() {
 
             {/* 3. My Favourites */}
             <button
-              onClick={() => handleNavigation('favs')}
+              onClick={() => handleNavigation("favs")}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 !isSidebarOpen && "md:justify-center md:px-2"
               } ${
                 isFavsActive
-                  ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
-                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  ? "bg-[#86efac] text-[#0f1712] shadow-sm"
+                  : "text-gray-300 hover:text-white hover:bg-white/5"
               }`}
-              title="My Favourites"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -264,15 +238,14 @@ export default function CitizenDash() {
 
             {/* 4. Citizen Form */}
             <button
-              onClick={() => handleNavigation('form')}
+              onClick={() => handleNavigation("form")}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 !isSidebarOpen && "md:justify-center md:px-2"
               } ${
                 isFormActive
-                  ? 'bg-[#86efac] text-[#0f1712] shadow-sm'
-                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  ? "bg-[#86efac] text-[#0f1712] shadow-sm"
+                  : "text-gray-300 hover:text-white hover:bg-white/5"
               }`}
-              title="Citizen Form"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -282,14 +255,13 @@ export default function CitizenDash() {
           </nav>
         </div>
 
-        {/* Bottom Sign Out Button */}
+        {/* Bottom Logout Button */}
         <div className="pt-4 pb-2 border-t border-white/5 w-full">
           <button
             onClick={handleLogout}
             className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer ${
               !isSidebarOpen && "md:justify-center md:px-1"
             }`}
-            title="Sign Out"
           >
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -299,19 +271,15 @@ export default function CitizenDash() {
         </div>
       </aside>
 
-      {/* ==================================================== */}
-      {/* 2. RIGHT PANEL: TOP BAR + MAIN CONTENT               */}
-      {/* ==================================================== */}
+      {/* ================= 2. MAIN CONTENT AREA ================= */}
       <div className="flex-1 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
 
-        {/* Top Bar Header with Hamburger Slide Button */}
+        {/* Top Navbar */}
         <header className="px-4 sm:px-6 py-3 sm:py-4 bg-white/70 backdrop-blur-sm border-b border-gray-200/60 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* 👉 Hamburger Button (Opens/Closes Sidebar) */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 rounded-xl bg-gray-100 hover:bg-emerald-950 hover:text-white text-gray-700 transition cursor-pointer"
-              title="Toggle Menu"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -328,7 +296,7 @@ export default function CitizenDash() {
             </div>
           </div>
 
-          {/* Right mini profile avatar */}
+          {/* User Mini Avatar */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="text-right hidden sm:block">
               <p className="text-xs font-semibold text-gray-800 capitalize">{userName}</p>
@@ -340,40 +308,32 @@ export default function CitizenDash() {
           </div>
         </header>
 
-        {/* Main Content Body */}
+        {/* Main Body */}
         <main className="p-4 sm:p-6 lg:p-8 flex-1">
           {isWelcomePage ? (
-            /* ==================================================== */
-            /* WELCOME BANNER + 3 QUICK NAVIGATION CARDS            */
-            /* ==================================================== */
+            /* Welcome Hero + Quick Action Cards */
             <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto">
               
-              {/* HERO BANNER (Dark Forest Green) */}
+              {/* HERO BANNER */}
               <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#143225] text-white p-6 sm:p-10 shadow-sm">
-                
-                {/* Decorative Circular Accent */}
                 <div className="absolute -right-12 -top-12 w-48 h-48 sm:w-64 sm:h-64 rounded-full border-[14px] sm:border-[18px] border-emerald-800/30 pointer-events-none" />
 
                 <div className="relative z-10 max-w-xl">
-                  {/* Badge */}
                   <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-600/40 text-emerald-300 mb-3 sm:mb-4">
                     Citizen Dashboard
                   </span>
 
-                  {/* Heading */}
                   <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white mb-2 leading-tight">
                     Welcome Back,<br />
                     <span className="break-all text-[#86efac]">{userEmail}!</span>
                   </h1>
 
-                  {/* Description */}
                   <p className="text-emerald-100/75 text-xs sm:text-sm leading-relaxed mb-6 font-normal">
                     Welcome to Evenue. Discover trusted event vendors, save your favourites and make every celebration special.
                   </p>
 
-                  {/* Action Button */}
                   <button
-                    onClick={() => handleNavigation('search')}
+                    onClick={() => handleNavigation("search")}
                     className="inline-flex items-center gap-2 bg-[#86efac] hover:bg-[#6ee7b7] text-[#0f1712] text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer"
                   >
                     <span>Explore Vendors</span>
@@ -382,7 +342,7 @@ export default function CitizenDash() {
                 </div>
               </div>
 
-              {/* QUICK NAVIGATION SECTION */}
+              {/* 3 QUICK NAVIGATION CARDS */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
                   Quick Navigation
@@ -394,12 +354,11 @@ export default function CitizenDash() {
                   Select an option to continue.
                 </p>
 
-                {/* 3 Quick Navigation Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
                   
                   {/* Card 1: Search Vendors */}
                   <div
-                    onClick={() => handleNavigation('search')}
+                    onClick={() => handleNavigation("search")}
                     className="bg-white rounded-2xl border border-gray-200/70 p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group active:scale-[0.99]"
                   >
                     <div className="flex items-center justify-between mb-4">
@@ -422,7 +381,7 @@ export default function CitizenDash() {
 
                   {/* Card 2: My Favourites */}
                   <div
-                    onClick={() => handleNavigation('favs')}
+                    onClick={() => handleNavigation("favs")}
                     className="bg-white rounded-2xl border border-gray-200/70 p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group active:scale-[0.99]"
                   >
                     <div className="flex items-center justify-between mb-4">
@@ -445,7 +404,7 @@ export default function CitizenDash() {
 
                   {/* Card 3: Citizen Form */}
                   <div
-                    onClick={() => handleNavigation('form')}
+                    onClick={() => handleNavigation("form")}
                     className="bg-white rounded-2xl border border-gray-200/70 p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group active:scale-[0.99]"
                   >
                     <div className="flex items-center justify-between mb-4">
@@ -471,9 +430,7 @@ export default function CitizenDash() {
 
             </div>
           ) : (
-            /* ==================================================== */
-            /* CHILD PAGES (Citizen Form, Search, Favs)             */
-            /* ==================================================== */
+            /* CHILD ROUTES RENDER CONTAINER (Search, Favs, Form) */
             <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200/70 p-4 sm:p-6 shadow-sm overflow-x-auto">
               <Outlet />
             </div>

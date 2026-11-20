@@ -3,142 +3,137 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:2005";
 
+// ----------------------------------------------------
+// 1. DATA STRUCTURE (User item interface)
+// ----------------------------------------------------
 export interface UserItem {
   _id?: string;
   emailid: string;
   utype: "Citizen" | "Vendor" | string;
   status: boolean; // true = Active, false = Blocked
-  createdAt?: string;
 }
 
 export default function AdminDash() {
   const navigate = useNavigate();
 
+  // ----------------------------------------------------
+  // 2. STATE VARIABLES
+  // ----------------------------------------------------
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
-  const [alertMessage, setAlertMessage] = useState<string>("");
 
-  // Filters
+  // Search & Filter States
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
 
-  // Check admin session on mount
+  const currentAdmin = localStorage.getItem("evenue_admin") || "admin@evenue.com";
+
+  // ----------------------------------------------------
+  // 3. CHECK ADMIN LOGIN & LOAD ALL USERS
+  // ----------------------------------------------------
   useEffect(() => {
-    const savedAdmin = localStorage.getItem("evenue_admin");
-    if (!savedAdmin) {
-      // 🔒 Agar Admin login nahi hai toh /login page par bhej do
+    const admin = localStorage.getItem("evenue_admin");
+
+    // Agar admin login nahi hai, to login page par bhej do
+    if (!admin) {
       navigate("/login");
     } else {
       fetchAllUsers();
     }
   }, [navigate]);
 
-  // Admin Logout
+  // Backend se sabhi users (Citizen & Vendor) fetch karna
+  async function fetchAllUsers() {
+    try {
+      setLoading(true);
+      const resp = await axios.post(`${API_URL}/admin/fetchallusers`);
+
+      if (resp.data && resp.data.data) {
+        setUsers(resp.data.data);
+      } else if (Array.isArray(resp.data)) {
+        setUsers(resp.data);
+      }
+    } catch (err) {
+      alert("Error fetching users from database!");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ----------------------------------------------------
+  // 4. BLOCK / RESUME USER (TOGGLE STATUS)
+  // ----------------------------------------------------
+  async function handleToggleStatus(emailid: string, currentStatus: boolean) {
+    const newStatus = !currentStatus;
+
+    try {
+      const resp = await axios.post(`${API_URL}/admin/updatestatus`, {
+        emailid: emailid,
+        status: newStatus,
+      });
+
+      if (resp.data.status !== false) {
+        // Table me status live update karna
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.emailid === emailid ? { ...user, status: newStatus } : user
+          )
+        );
+        alert(`User ${emailid} is now ${newStatus ? "Active" : "Blocked"}!`);
+      }
+    } catch (err) {
+      alert("Error updating status!");
+    }
+  }
+
+  // ----------------------------------------------------
+  // 5. PERMANENTLY DELETE USER
+  // ----------------------------------------------------
+  async function handleDeleteUser(emailid: string) {
+    const isConfirm = window.confirm(`Are you sure you want to delete ${emailid}?`);
+    if (!isConfirm) return;
+
+    try {
+      const resp = await axios.post(`${API_URL}/admin/deleteuser`, {
+        emailid: emailid,
+      });
+
+      if (resp.data.status !== false) {
+        // Table se user live remove karna
+        setUsers((prev) => prev.filter((user) => user.emailid !== emailid));
+        alert(`User ${emailid} deleted successfully!`);
+      }
+    } catch (err) {
+      alert("Error deleting user!");
+    }
+  }
+
+  // ----------------------------------------------------
+  // 6. ADMIN LOGOUT
+  // ----------------------------------------------------
   function handleAdminLogout() {
-    if (window.confirm("Are you sure you want to sign out from Admin Console?")) {
+    if (window.confirm("Are you sure you want to logout?")) {
       localStorage.removeItem("evenue_admin");
       localStorage.removeItem("evenue_user");
       navigate("/login");
     }
   }
 
-  // Fetch Users
-  async function fetchAllUsers() {
-    try {
-      setLoading(true);
-      setErrorMessage("");
-
-      const response = await axios.post(`${API_URL}/admin/fetchallusers`);
-
-      if (response.data && response.data.status && Array.isArray(response.data.data)) {
-        setUsers(response.data.data);
-      } else if (Array.isArray(response.data)) {
-        setUsers(response.data);
-      } else {
-        setUsers([]);
-      }
-    } catch (error: any) {
-      console.error("Fetch Users Error:", error);
-      setErrorMessage("Could not fetch users. Please check backend connection.");
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Block / Resume User
-  async function handleToggleStatus(emailid: string, currentStatus: boolean) {
-    const newStatus = !currentStatus;
-    const actionText = newStatus ? "Resumed (Active)" : "Blocked";
-
-    try {
-      const response = await axios.post(`${API_URL}/admin/updatestatus`, {
-        emailid: emailid,
-        status: newStatus,
-      });
-
-      if (response.data && response.data.status === false) {
-        showAlert(response.data.msg || "Failed to update status.");
-        return;
-      }
-
-      // Live update table state
-      setUsers((prevUsers) =>
-        prevUsers.map((user) =>
-          user.emailid === emailid ? { ...user, status: newStatus } : user
-        )
-      );
-
-      showAlert(`User ${emailid} has been ${actionText} successfully!`);
-    } catch (err) {
-      showAlert("Server communication error while updating status.");
-    }
-  }
-
-  // Delete User Permanently
-  async function handleDeleteUser(emailid: string) {
-    const confirmDelete = window.confirm(
-      `⚠️ PERMANENT DELETE: Are you sure you want to delete user: ${emailid}? This cannot be undone.`
-    );
-    if (!confirmDelete) return;
-
-    try {
-      const response = await axios.post(`${API_URL}/admin/deleteuser`, {
-        emailid: emailid,
-      });
-
-      if (response.data && response.data.status === false) {
-        showAlert(response.data.msg || "Failed to delete user.");
-        return;
-      }
-
-      // Live remove from state
-      setUsers((prevUsers) => prevUsers.filter((user) => user.emailid !== emailid));
-      showAlert(`User ${emailid} was permanently deleted.`);
-    } catch (err) {
-      showAlert("Server communication error while deleting user.");
-    }
-  }
-
-  function showAlert(msg: string) {
-    setAlertMessage(msg);
-    setTimeout(() => setAlertMessage(""), 3500);
-  }
-
-  // Stats
+  // ----------------------------------------------------
+  // 7. STATS & FILTER CALCULATIONS (Easy to Understand)
+  // ----------------------------------------------------
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => u.status === true).length;
   const blockedUsers = users.filter((u) => u.status === false).length;
   const totalCitizens = users.filter((u) => u.utype?.toLowerCase() === "citizen").length;
   const totalVendors = users.filter((u) => u.utype?.toLowerCase() === "vendor").length;
 
-  // Search filter
+  // Search & Filter Logic
   const filteredUsers = users.filter((user) => {
-    const matchesSearch = user.emailid.toLowerCase().includes(searchTerm.toLowerCase().trim());
+    const matchesEmail = user.emailid.toLowerCase().includes(searchTerm.toLowerCase().trim());
     const matchesType =
       selectedType === "All" || user.utype?.toLowerCase() === selectedType.toLowerCase();
     const matchesStatus =
@@ -146,18 +141,17 @@ export default function AdminDash() {
       (selectedStatus === "Active" && user.status === true) ||
       (selectedStatus === "Blocked" && user.status === false);
 
-    return matchesSearch && matchesType && matchesStatus;
+    return matchesEmail && matchesType && matchesStatus;
   });
 
-  const currentAdmin = localStorage.getItem("evenue_admin") || "admin@evenue.com";
-
+  // ----------------------------------------------------
+  // 8. EXACT SAME USER INTERFACE (UI)
+  // ----------------------------------------------------
   return (
     <div className="min-h-screen bg-[#FBFBFA] text-[#11130F] font-sans p-3 sm:p-6 lg:p-8 selection:bg-emerald-100 selection:text-emerald-900">
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-7">
         
-        {/* ==================================================== */}
-        {/* 1. TOP ADMIN BANNER (RESPONSIVE)                    */}
-        {/* ==================================================== */}
+        {/* ================= 1. TOP ADMIN BANNER ================= */}
         <div className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-emerald-950 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-5 sm:gap-6">
           <div className="absolute -right-10 -bottom-10 w-60 h-60 sm:w-72 sm:h-72 rounded-full bg-emerald-600/20 blur-3xl pointer-events-none" />
 
@@ -175,8 +169,12 @@ export default function AdminDash() {
 
           <div className="relative z-10 flex flex-wrap items-center gap-2.5 sm:gap-3 w-full md:w-auto">
             <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/15 text-left md:text-right flex-1 sm:flex-initial">
-              <span className="text-[9px] sm:text-[10px] text-emerald-200 block uppercase font-medium">Logged in Admin</span>
-              <span className="text-xs font-semibold text-white font-mono break-all">{currentAdmin}</span>
+              <span className="text-[9px] sm:text-[10px] text-emerald-200 block uppercase font-medium">
+                Logged in Admin
+              </span>
+              <span className="text-xs font-semibold text-white font-mono break-all">
+                {currentAdmin}
+              </span>
             </div>
 
             <button
@@ -196,30 +194,7 @@ export default function AdminDash() {
           </div>
         </div>
 
-        {/* Runtime Notifications */}
-        {alertMessage && (
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2">
-              <span>✓</span>
-              <span>{alertMessage}</span>
-            </div>
-            <button onClick={() => setAlertMessage("")} className="font-bold text-sm cursor-pointer p-1">✕</button>
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2">
-              <span>⚠</span>
-              <span>{errorMessage}</span>
-            </div>
-            <button onClick={fetchAllUsers} className="px-3 py-1 bg-red-600 text-white rounded-lg cursor-pointer">Retry</button>
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* 2. STATS CARDS (RESPONSIVE GRID)                    */}
-        {/* ==================================================== */}
+        {/* ================= 2. STATS CARDS ================= */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-xs">
             <p className="text-[10px] sm:text-[11px] font-bold uppercase text-stone-500 tracking-wider">Total Registered</p>
@@ -258,9 +233,7 @@ export default function AdminDash() {
           </div>
         </div>
 
-        {/* ==================================================== */}
-        {/* 3. SEARCH & FILTER BAR (STACKS ON MOBILE)           */}
-        {/* ==================================================== */}
+        {/* ================= 3. SEARCH & FILTERS ================= */}
         <div className="bg-white p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1">
             <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400 text-xs">
@@ -298,15 +271,12 @@ export default function AdminDash() {
           </div>
         </div>
 
-        {/* ==================================================== */}
-        {/* 4. USER DIRECTORY CONTAINER                         */}
-        {/* ==================================================== */}
+        {/* ================= 4. USERS DIRECTORY ================= */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200 shadow-xs overflow-hidden">
           
-          {/* Loading and Empty State */}
           {loading && (
             <div className="p-10 text-center text-xs text-stone-400">
-              Loading users from database collection...
+              Loading users from database...
             </div>
           )}
 
@@ -316,9 +286,7 @@ export default function AdminDash() {
             </div>
           )}
 
-          {/* -------------------------------------------------- */}
-          {/* A. MOBILE VIEW: CARDS (Visible only on mobile)     */}
-          {/* -------------------------------------------------- */}
+          {/* MOBILE CARDS VIEW */}
           {!loading && filteredUsers.length > 0 && (
             <div className="md:hidden divide-y divide-stone-100">
               {filteredUsers.map((user) => {
@@ -326,7 +294,6 @@ export default function AdminDash() {
 
                 return (
                   <div key={user.emailid} className="p-4 space-y-3">
-                    {/* Row 1: Email and Role */}
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-mono font-medium text-xs text-stone-900 break-all">
                         {user.emailid}
@@ -342,9 +309,7 @@ export default function AdminDash() {
                       )}
                     </div>
 
-                    {/* Row 2: Status & Action Buttons */}
                     <div className="flex items-center justify-between pt-1">
-                      {/* Status */}
                       {isActive ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
@@ -357,7 +322,6 @@ export default function AdminDash() {
                         </span>
                       )}
 
-                      {/* Action buttons */}
                       <div className="flex items-center gap-2">
                         {isActive ? (
                           <button
@@ -392,9 +356,7 @@ export default function AdminDash() {
             </div>
           )}
 
-          {/* -------------------------------------------------- */}
-          {/* B. DESKTOP VIEW: TABLE (Visible on tablets & above)*/}
-          {/* -------------------------------------------------- */}
+          {/* DESKTOP TABLE VIEW */}
           {!loading && filteredUsers.length > 0 && (
             <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-stone-200 text-left text-xs">
@@ -414,12 +376,12 @@ export default function AdminDash() {
                     return (
                       <tr key={user.emailid} className="hover:bg-stone-50/80 transition-colors">
                         
-                        {/* 1. Email ID */}
+                        {/* Email */}
                         <td className="px-6 py-4 font-mono font-medium text-stone-900 whitespace-nowrap">
                           {user.emailid}
                         </td>
 
-                        {/* 2. Role Badge */}
+                        {/* Role */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           {user.utype?.toLowerCase() === "vendor" ? (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
@@ -432,7 +394,7 @@ export default function AdminDash() {
                           )}
                         </td>
 
-                        {/* 3. Account Status Badge */}
+                        {/* Status */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           {isActive ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200">
@@ -447,7 +409,7 @@ export default function AdminDash() {
                           )}
                         </td>
 
-                        {/* 4. Action Buttons */}
+                        {/* Actions */}
                         <td className="px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             {isActive ? (

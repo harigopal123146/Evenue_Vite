@@ -1,165 +1,101 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL;
-// ----------------------------------------------------
-// Global Axios Interceptor for Token Expiry / Unauthorized Access
-// ----------------------------------------------------
-axios.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-      alert('Your session has expired. Please log in again.');
-      localStorage.removeItem('token');
-      localStorage.removeItem('citizenEmail');
-      localStorage.removeItem('evenue_user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:2005";
 
 // ----------------------------------------------------
-// 1. Interfaces
+// 1. DATA STRUCTURE (Citizen Form Fields)
 // ----------------------------------------------------
 export interface CitizenFormState {
-  emailid: string;       // Citizen email address (Auto-filled & Read-only)
-  acardno: string;       // Aadhaar / ID Card Number (read-only, auto-filled by GenAI)
-  name: string;          // Citizen Full Name (read-only, auto-filled by GenAI)
-  dob: string;           // Date of Birth (read-only, auto-filled by GenAI)
-  gender: string;        // Gender (read-only, auto-filled by GenAI)
-  address: string;       // Residential Address (read-only, auto-filled by GenAI)
-  city: string;          // City (read-only, auto-filled by GenAI)
-  contact: string;       // 10-digit mobile number (Editable)
-  frontpic: File | null; // Front side of document
-  backpic: File | null;  // Back side of document
-}
-
-export interface ValidationStatus {
-  isValid: boolean;
-  message: string;
-}
-
-export interface GenAiAadhaarData {
-  acardno?: string;
-  name?: string;
-  dob?: string;
-  gender?: string;
-  address?: string;
-  city?: string;
+  emailid: string;       // Auto-filled & Read-only
+  acardno: string;       // Aadhaar / ID Number (AI dwara bhara jayega)
+  name: string;          // Full Name (AI dwara bhara jayega)
+  dob: string;           // Date of Birth (AI dwara bhara jayega)
+  gender: string;        // Gender (AI dwara bhara jayega)
+  address: string;       // Address (AI dwara bhara jayega)
+  city: string;          // City (AI dwara bhara jayega)
+  contact: string;       // Mobile number (User khud bhar sakta hai)
+  frontpic: File | null; // Front Photo
+  backpic: File | null;  // Back Photo
 }
 
 function CitizenRegistration() {
-  // ----------------------------------------------------
-  // 2. Initial States
-  // ----------------------------------------------------
+  // Initial empty form state
   const initial_obj: CitizenFormState = {
-    emailid: '',
-    acardno: '',
-    name: '',
-    dob: '',
-    gender: '',
-    address: '',
-    city: '',
-    contact: '',
+    emailid: "",
+    acardno: "",
+    name: "",
+    dob: "",
+    gender: "",
+    address: "",
+    city: "",
+    contact: "",
     frontpic: null,
     backpic: null,
   };
 
+  // ----------------------------------------------------
+  // 2. STATE VARIABLES
+  // ----------------------------------------------------
   const [obj, setObj] = useState<CitizenFormState>(initial_obj);
-  const [frontPicPrev, setFrontPicPrev] = useState<string>('');
-  const [backPicPrev, setBackPicPrev] = useState<string>('');
+  const [frontPicPrev, setFrontPicPrev] = useState<string>("");
+  const [backPicPrev, setBackPicPrev] = useState<string>("");
+
   const [isAiScanning, setIsAiScanning] = useState<boolean>(false);
-  const [aiStatusMsg, setAiStatusMsg] = useState<string>('');
-  const [validations, setValidations] = useState<{ [key: string]: ValidationStatus }>({});
-  
-  // Registration Status Trackers
+  const [aiStatusMsg, setAiStatusMsg] = useState<string>("");
+
   const [isExistingUser, setIsExistingUser] = useState<boolean>(false);
   const [isCheckingRecord, setIsCheckingRecord] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // ----------------------------------------------------
-  // 3. Auto-load on Login & Refresh (Seamless Fetch)
+  // 3. AUTO FETCH: Page load hone par purana record lana
   // ----------------------------------------------------
   useEffect(() => {
-    let email = localStorage.getItem('citizenEmail');
-
-    if (!email) {
-      const storedUser = localStorage.getItem('evenue_user');
-      if (storedUser) {
-        try {
-          const parsed = JSON.parse(storedUser);
-          email = parsed.emailid;
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
+    let email = localStorage.getItem("citizenEmail");
 
     if (email) {
-      const cleanEmail = email.trim();
-      setObj((prev) => ({ ...prev, emailid: cleanEmail }));
-      // Automatically fetch existing data on page load or refresh
-      autoFetchCitizenRecord(cleanEmail);
+      setObj((prev) => ({ ...prev, emailid: email }));
+      autoFetchCitizenRecord(email);
     } else {
       setIsCheckingRecord(false);
     }
   }, []);
 
-  // ----------------------------------------------------
-  // 4. Background Auto-Fetch Service
-  // ----------------------------------------------------
   async function autoFetchCitizenRecord(email: string) {
-    if (!email) return;
-
     try {
       setIsCheckingRecord(true);
-      // const url = 'http://localhost:2005/citizen/citizenFetch';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
 
       const resp = await axios.post(
         `${API_URL}/citizen/citizenFetch`,
         { emailid: email.trim() },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { authorization: `Bearer ${token}` } }
       );
 
-      if (resp.data.status === true) {
-        let rawData = resp.data.msg;
-        let data = Array.isArray(rawData) ? rawData[0] : rawData;
+      if (resp.data.status === true && resp.data.msg) {
+        let data = resp.data.msg;
+        if (Array.isArray(data)) data = data[0]; // Agar array aaye to first element lein
 
-        if (typeof data === 'string' || !data) {
-          data = resp.data.doc || resp.data.rec || resp.data.data || {};
-        }
+        setObj({
+          emailid: email,
+          acardno: data.acardno || "",
+          name: data.name || "",
+          dob: data.dob || "",
+          gender: data.gender || "",
+          address: data.address || "",
+          city: data.city || "",
+          contact: data.contact || "",
+          frontpic: null,
+          backpic: null,
+        });
 
-        if (data && typeof data === 'object' && (data.name || data.acardno || data.contact)) {
-          setObj({
-            emailid: email,
-            acardno: data.acardno || data.aadhaarno || data.aadhar || '',
-            name: data.name || '',
-            dob: data.dob || '',
-            gender: data.gender || '',
-            address: data.address || '',
-            city: data.city || '',
-            contact: data.contact || data.mobile || data.phone || '',
-            frontpic: null,
-            backpic: null,
-          });
-
-          // Mark as already registered: Save = Disabled, Update = Enabled
-          setIsExistingUser(true);
-        } else {
-          setIsExistingUser(false);
-        }
+        setIsExistingUser(true); // Pehle se registered hai
       } else {
-        // No existing record found: Save = Enabled, Update = Disabled
         setIsExistingUser(false);
       }
     } catch (error) {
-      console.warn('Auto fetch citizen record note:', error);
+      console.log("No previous citizen record found.");
       setIsExistingUser(false);
     } finally {
       setIsCheckingRecord(false);
@@ -167,68 +103,41 @@ function CitizenRegistration() {
   }
 
   // ----------------------------------------------------
-  // 5. Validation Helper Function
-  // ----------------------------------------------------
-  function validateField(name: string, value: string): ValidationStatus {
-    if (value.trim() === '') {
-      return { isValid: false, message: 'This field is required' };
-    }
-
-    if (name === 'contact') {
-      const phoneRegex = /^[6-9]\d{9}$/;
-      return phoneRegex.test(value.trim())
-        ? { isValid: true, message: 'Valid Contact ✓' }
-        : { isValid: false, message: 'Must be 10 digits starting with 6-9' };
-    }
-
-    return { isValid: true, message: 'Valid ✓' };
-  }
-
-  // ----------------------------------------------------
-  // 6. Input Change Handler
+  // 4. INPUT HANDLER (Contact number ke liye)
   // ----------------------------------------------------
   function doUpdateObj(event: React.ChangeEvent<HTMLInputElement>) {
-    const { name, value } = event.target;
+    let { name, value } = event.target;
 
-    setObj((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    if (name === 'contact') {
-      const valResult = validateField(name, value);
-      setValidations((prev) => ({
-        ...prev,
-        [name]: valResult,
-      }));
+    // Contact me sirf digits aur max 10 allow karein
+    if (name === "contact") {
+      value = value.replace(/\D/g, "").slice(0, 10);
     }
+
+    setObj((prev) => ({ ...prev, [name]: value }));
   }
 
   // ----------------------------------------------------
-  // 7. GenAI Backend OCR Processor
+  // 5. GenAI OCR: Document se data nikalna
   // ----------------------------------------------------
   async function triggerGenAiOcr(frontFile: File | null, backFile: File | null) {
     if (!frontFile && !backFile) return;
 
     setIsAiScanning(true);
-    setAiStatusMsg('Evenue GenAI is extracting credentials from ID document...');
+    setAiStatusMsg("Evenue GenAI is extracting details from ID document...");
 
-    // const ocrUrl = 'http://localhost:2005/citizen/citizenExtAdhar';
-    const ocrFormData = new FormData();
-
-    if (frontFile) ocrFormData.append('frontpic', frontFile);
-    if (backFile) ocrFormData.append('backpic', backFile);
+    const ocrData = new FormData();
+    if (frontFile) ocrData.append("frontpic", frontFile);
+    if (backFile) ocrData.append("backpic", backFile);
 
     try {
-      const token = localStorage.getItem('token');
-      const resp = await axios.post(`${API_URL}/citizen/citizenExtAdhar`, ocrFormData, {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
+      const token = localStorage.getItem("token");
+      const resp = await axios.post(`${API_URL}/citizen/citizenExtAdhar`, ocrData, {
+        headers: { authorization: `Bearer ${token}` },
       });
 
       if (resp.data.status === true && resp.data.extracted) {
-        const extracted: GenAiAadhaarData = resp.data.extracted;
+        const extracted = resp.data.extracted;
+        // AI dwara nikala gaya data state me fill karein
         setObj((prev) => ({
           ...prev,
           acardno: extracted.acardno || prev.acardno,
@@ -238,169 +147,141 @@ function CitizenRegistration() {
           address: extracted.address || prev.address,
           city: extracted.city || prev.city,
         }));
-        setAiStatusMsg('Aadhaar / ID details extracted successfully ✓');
+        setAiStatusMsg("Aadhaar / ID details extracted successfully ✓");
       } else {
-        setAiStatusMsg(resp.data.msg || 'Document processed.');
+        setAiStatusMsg("Document processed successfully ✓");
       }
     } catch (error) {
-      console.warn('Backend GenAI OCR response:', error);
-      setTimeout(() => {
-        setAiStatusMsg('Document processed with GenAI ✓');
-      }, 1000);
+      setAiStatusMsg("Document uploaded ✓");
     } finally {
       setIsAiScanning(false);
     }
   }
 
-  // ----------------------------------------------------
-  // 8. Document Upload Handlers
-  // ----------------------------------------------------
+  // Front Picture Handler
   function doShowFrontPic(event: React.ChangeEvent<HTMLInputElement>) {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setObj((prev) => ({ ...prev, frontpic: file }));
       setFrontPicPrev(URL.createObjectURL(file));
-      triggerGenAiOcr(file, obj.backpic);
+      triggerGenAiOcr(file, obj.backpic); // AI scan call
     }
   }
 
+  // Back Picture Handler
   function doShowBackPic(event: React.ChangeEvent<HTMLInputElement>) {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setObj((prev) => ({ ...prev, backpic: file }));
       setBackPicPrev(URL.createObjectURL(file));
-      triggerGenAiOcr(obj.frontpic, file);
+      triggerGenAiOcr(obj.frontpic, file); // AI scan call
     }
   }
 
   // ----------------------------------------------------
-  // 9. Save New Citizen Record (Disabled if already saved)
+  // 6. VALIDATION (All Fields Required)
+  // ----------------------------------------------------
+  function checkValidation(): boolean {
+    if (!obj.emailid.trim()) {
+      alert("Email ID is required!");
+      return false;
+    }
+    if (!obj.acardno.trim() || !obj.name.trim()) {
+      alert("Please upload ID document so GenAI can extract your Name & ID details!");
+      return false;
+    }
+    if (!obj.dob.trim()) {
+      alert("DOB is required!");
+      return false;
+    }
+    if (!obj.gender.trim()) {
+      alert("Gender is required!");
+      return false;
+    }
+    if (!obj.address.trim()) {
+      alert("Address is required!");
+      return false;
+    }
+    if (!obj.city.trim()) {
+      alert("City is required!");
+      return false;
+    }
+    if (!obj.contact.trim() || obj.contact.length !== 10) {
+      alert("Please enter a valid 10-digit Contact Number!");
+      return false;
+    }
+    return true;
+  }
+
+  // ----------------------------------------------------
+  // 7. SAVE CITIZEN DETAILS (NEW)
   // ----------------------------------------------------
   async function doSaveObj(event: React.FormEvent) {
     event.preventDefault();
 
-    if (isExistingUser) {
-      alert('Your details are already saved. Use "Update Details" to modify!');
-      return;
-    }
-
-    if (!obj.emailid || !obj.contact) {
-      alert('Please fill mandatory contact number!');
-      return;
-    }
-
-    const contactCheck = validateField('contact', obj.contact);
-    if (!contactCheck.isValid) {
-      alert(contactCheck.message);
-      return;
-    }
-
-    if (!obj.acardno || !obj.name) {
-      const proceed = window.confirm(
-        'ID details appear empty. Have you uploaded your document for GenAI auto-fill? Click OK to save anyway, or Cancel to upload.'
-      );
-      if (!proceed) return;
-    }
-
-    // const url = 'http://localhost:2005/citizen/citizenSave';
-    const citizenPayload = {
-      emailid: obj.emailid.trim(),
-      acardno: obj.acardno || '',
-      name: obj.name || '',
-      dob: obj.dob || '',
-      gender: obj.gender || '',
-      address: obj.address || '',
-      city: obj.city || '',
-      contact: obj.contact.trim(),
-    };
+    if (!checkValidation()) return;
 
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
-      const resp = await axios.post(`${API_URL}/citizen/citizenSave`, citizenPayload, {
+      const token = localStorage.getItem("token");
+
+      const resp = await axios.post(`${API_URL}/citizen/citizenSave`, obj, {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           authorization: `Bearer ${token}`,
         },
       });
 
       if (resp.data.status === true) {
-        alert('🎉 Citizen Registered Successfully: ' + (resp.data.msg || 'Success!'));
-        // Automatically switch states: Now Save is disabled, Update is enabled
+        alert(resp.data.msg || "🎉 Citizen Registered Successfully!");
         setIsExistingUser(true);
       } else {
-        alert('Failed: ' + resp.data.msg);
+        alert("Failed: " + resp.data.msg);
       }
     } catch (error) {
-      console.error('Save error:', error);
-      alert('Error saving citizen data.');
+      alert("Error saving citizen data.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   // ----------------------------------------------------
-  // 10. Update Existing Citizen Details (Enabled if already saved)
+  // 8. UPDATE CITIZEN DETAILS (EXISTING)
   // ----------------------------------------------------
   async function doModifyObj() {
-    if (!isExistingUser) {
-      alert('No existing profile found. Please click "Save Citizen Details" first!');
-      return;
-    }
-
-    if (!obj.emailid) {
-      alert('Email Id is required to modify citizen details');
-      return;
-    }
-
-    const contactCheck = validateField('contact', obj.contact);
-    if (!contactCheck.isValid) {
-      alert(contactCheck.message);
-      return;
-    }
-
-    // const url = 'http://localhost:2005/citizen/citizenUpdate';
-    const citizenPayload = {
-      emailid: obj.emailid.trim(),
-      acardno: obj.acardno || '',
-      name: obj.name || '',
-      dob: obj.dob || '',
-      gender: obj.gender || '',
-      address: obj.address || '',
-      city: obj.city || '',
-      contact: obj.contact.trim(),
-    };
+    if (!checkValidation()) return;
 
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('token');
-      const resp = await axios.post(`${API_URL}/citizen/citizenUpdate`, citizenPayload, {
+      const token = localStorage.getItem("token");
+
+      const resp = await axios.post(`${API_URL}/citizen/citizenUpdate`, obj, {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           authorization: `Bearer ${token}`,
         },
       });
 
       if (resp.data.status === true) {
-        alert('✓ Citizen Details Updated Successfully: ' + (resp.data.msg || 'Updated'));
+        alert(resp.data.msg || "✓ Citizen Details Updated Successfully!");
       } else {
-        alert('Modify Failed: ' + resp.data.msg);
+        alert("Update Failed: " + resp.data.msg);
       }
     } catch (error) {
-      console.error('Modify error:', error);
-      alert('Error modifying citizen record.');
+      alert("Error modifying citizen record.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  // ----------------------------------------------------
+  // 9. EXACT SAME UI (JSX)
+  // ----------------------------------------------------
   return (
     <div className="w-full flex justify-center py-6 px-3 sm:px-6">
       <div className="w-full max-w-4xl bg-white rounded-3xl border border-stone-200/90 shadow-xl p-6 sm:p-10 space-y-7">
         
-        {/* ========================================================
-            1. TOP HEADER & VERIFICATION BADGE
-           ======================================================== */}
+        {/* ================= 1. HEADER & STATUS ================= */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-100 gap-4">
           <div>
             <div className="flex items-center gap-2.5">
@@ -414,7 +295,7 @@ function CitizenRegistration() {
             </p>
           </div>
 
-          {/* Dynamic Registration Status Pill */}
+          {/* Status Pill */}
           <div className="flex items-center gap-2">
             {isCheckingRecord ? (
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 border border-stone-200 animate-pulse">
@@ -435,9 +316,7 @@ function CitizenRegistration() {
           </div>
         </div>
 
-        {/* ========================================================
-            2. CLEAN READ-ONLY EMAIL CARD (No Refresh Button)
-           ======================================================== */}
+        {/* ================= 2. EMAIL (READ-ONLY) ================= */}
         <div className="p-4 sm:p-5 rounded-2xl bg-stone-50 border border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1.5">
@@ -467,15 +346,13 @@ function CitizenRegistration() {
           </div>
         </div>
 
-        {/* ========================================================
-            3. GENAI SCANNING STATUS BANNER
-           ======================================================== */}
+        {/* ================= 3. GENAI SCAN STATUS BANNER ================= */}
         {(isAiScanning || aiStatusMsg) && (
           <div
             className={`p-3.5 rounded-2xl border flex items-center gap-3 text-xs font-medium transition-all shadow-sm ${
               isAiScanning
-                ? 'bg-emerald-950 text-white border-emerald-800'
-                : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                ? "bg-emerald-950 text-white border-emerald-800"
+                : "bg-emerald-50 text-emerald-900 border-emerald-200"
             }`}
           >
             {isAiScanning ? (
@@ -487,18 +364,16 @@ function CitizenRegistration() {
               <span className="text-base shrink-0">✨</span>
             )}
             <span className="leading-tight">
-              {isAiScanning ? 'Processing ID document with Evenue GenAI OCR...' : aiStatusMsg}
+              {isAiScanning ? "Processing ID document with Evenue GenAI OCR..." : aiStatusMsg}
             </span>
           </div>
         )}
 
-        {/* ========================================================
-            4. MAIN 2-COLUMN FORM GRID
-           ======================================================== */}
+        {/* ================= 4. FORM GRID ================= */}
         <form onSubmit={doSaveObj} className="space-y-7">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
             
-            {/* LEFT COLUMN: Document Upload Cards */}
+            {/* LEFT COLUMN: Document Uploads */}
             <div className="md:col-span-5 rounded-2xl border border-stone-200 p-5 bg-stone-50/50 flex flex-col justify-between space-y-5">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700 pb-2 border-b border-stone-200">
@@ -509,7 +384,7 @@ function CitizenRegistration() {
                 </p>
               </div>
 
-              {/* Sub-card 1: Front Side */}
+              {/* Front Side */}
               <div className="space-y-2">
                 <div className="w-full h-36 border-2 border-dashed border-stone-200 hover:border-emerald-800 rounded-xl flex items-center justify-center overflow-hidden bg-white relative transition-colors duration-200 group">
                   {frontPicPrev ? (
@@ -540,7 +415,7 @@ function CitizenRegistration() {
                 </label>
               </div>
 
-              {/* Sub-card 2: Back Side */}
+              {/* Back Side */}
               <div className="space-y-2">
                 <div className="w-full h-36 border-2 border-dashed border-stone-200 hover:border-emerald-800 rounded-xl flex items-center justify-center overflow-hidden bg-white relative transition-colors duration-200 group">
                   {backPicPrev ? (
@@ -589,12 +464,11 @@ function CitizenRegistration() {
                     name="acardno"
                     value={obj.acardno}
                     readOnly
-                    placeholder="[Redacted ID Number] (Auto-extracted by GenAI)"
+                    placeholder="Auto-extracted by GenAI"
                     className="w-full rounded-xl border border-stone-200 bg-stone-50/70 px-3.5 py-2.5 text-sm font-mono text-stone-800 outline-none cursor-not-allowed select-all"
                   />
                 </div>
 
-                {/* Name & DOB in one row */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                   <div className="sm:col-span-7">
                     <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1">
@@ -625,7 +499,6 @@ function CitizenRegistration() {
                   </div>
                 </div>
 
-                {/* Gender */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1">
                     Gender
@@ -688,23 +561,8 @@ function CitizenRegistration() {
                     onChange={doUpdateObj}
                     maxLength={10}
                     placeholder="Enter 10-digit mobile number"
-                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-stone-800 outline-none transition-all duration-200 ${
-                      validations.contact
-                        ? validations.contact.isValid
-                          ? 'border-emerald-600 bg-emerald-50/20 focus:ring-1 focus:ring-emerald-600'
-                          : 'border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400'
-                        : 'border-stone-200 focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900'
-                    }`}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-stone-800 outline-none focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
                   />
-                  {validations.contact && (
-                    <span
-                      className={`text-[11px] font-medium block mt-1 ${
-                        validations.contact.isValid ? 'text-emerald-700' : 'text-red-600'
-                      }`}
-                    >
-                      {validations.contact.message}
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -712,11 +570,7 @@ function CitizenRegistration() {
 
           </div>
 
-          {/* ========================================================
-              5. ACTION BUTTONS: SMART SAVE & UPDATE
-              - If New User: Save is ENABLED, Update is DISABLED
-              - If Existing User: Save is DISABLED, Update is ENABLED
-             ======================================================== */}
+          {/* ================= 5. ACTION BUTTONS (SAVE & UPDATE) ================= */}
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-4 border-t border-stone-100">
             
             {/* SAVE BUTTON */}
@@ -726,12 +580,12 @@ function CitizenRegistration() {
                 disabled={isExistingUser || isSubmitting}
                 className={`w-full sm:w-56 py-3.5 text-sm font-semibold rounded-full shadow-sm transition-all duration-200 flex items-center justify-center gap-2 ${
                   isExistingUser
-                    ? 'bg-stone-100 text-stone-400 border border-stone-200 cursor-not-allowed opacity-60'
-                    : 'bg-emerald-950 hover:bg-emerald-900 text-white cursor-pointer active:scale-95 shadow-emerald-950/20 hover:shadow-md'
+                    ? "bg-stone-100 text-stone-400 border border-stone-200 cursor-not-allowed opacity-60"
+                    : "bg-emerald-950 hover:bg-emerald-900 text-white cursor-pointer active:scale-95 shadow-emerald-950/20 hover:shadow-md"
                 }`}
               >
-                <span>Save Citizen Details</span>
-                {!isExistingUser && <span>→</span>}
+                <span>{isSubmitting ? "Saving..." : "Save Citizen Details"}</span>
+                {!isExistingUser && !isSubmitting && <span>→</span>}
               </button>
               {isExistingUser && (
                 <p className="text-[10px] text-stone-400 mt-1 font-light">
@@ -748,12 +602,12 @@ function CitizenRegistration() {
                 disabled={!isExistingUser || isSubmitting}
                 className={`w-full sm:w-56 py-3.5 text-sm font-semibold rounded-full border transition-all duration-200 flex items-center justify-center gap-2 ${
                   !isExistingUser
-                    ? 'bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed opacity-60'
-                    : 'bg-white hover:bg-emerald-50 text-emerald-950 border-emerald-950 cursor-pointer active:scale-95 shadow-xs'
+                    ? "bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed opacity-60"
+                    : "bg-white hover:bg-emerald-50 text-emerald-950 border-emerald-950 cursor-pointer active:scale-95 shadow-xs"
                 }`}
               >
-                <span>Update Details</span>
-                {isExistingUser && <span>✓</span>}
+                <span>{isSubmitting ? "Updating..." : "Update Details"}</span>
+                {isExistingUser && !isSubmitting && <span>✓</span>}
               </button>
               {!isExistingUser && (
                 <p className="text-[10px] text-stone-400 mt-1 font-light">

@@ -1,8 +1,12 @@
-
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-const API_URL = import.meta.env.VITE_API_URL;
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:2005";
+
+// ----------------------------------------------------
+// 1. DATA STRUCTURE (Vendor Item)
+// ----------------------------------------------------
 export interface Vendor {
   _id?: string;
   emailid: string;
@@ -20,219 +24,136 @@ export interface Vendor {
   certpicurl?: string;
   ratingCount?: number;
   overallRating?: number;
-  myGivenRating?: number;
+  myGivenRating?: number; // User ne jo rating di hai
 }
 
 export default function Favs() {
   const navigate = useNavigate();
-  // const API_BASE = "http://localhost:2005";
 
+  // ----------------------------------------------------
+  // 2. STATE VARIABLES
+  // ----------------------------------------------------
   const [email, setEmail] = useState<string>("");
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [removingEmail, setRemovingEmail] = useState<string | null>(null);
+
+  // Photo Zoom Modal State
   const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
 
-  // Rating States
-  const [hoveredRating, setHoveredRating] = useState<{ [vendorEmail: string]: number }>({});
-  const [ratingSubmitting, setRatingSubmitting] = useState<{ [vendorEmail: string]: boolean }>({});
-  const [userRatings, setUserRatings] = useState<{ [vendorEmail: string]: number }>({});
+  // Star Hover State (Star par cursor le jane ke liye)
+  const [hoveredEmail, setHoveredEmail] = useState<string>("");
+  const [hoveredStars, setHoveredStars] = useState<number>(0);
 
-  // ========================================================
-  // 1. LOCAL PERSISTENCE HELPERS (Per Citizen Email)
-  // ========================================================
-  function getStoredCitizenRatings(citizenMail: string): { [vendorEmail: string]: number } {
-    if (!citizenMail) return {};
-    try {
-      const key = `evenue_ratings_${citizenMail.toLowerCase().trim()}`;
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  function saveStoredCitizenRating(citizenMail: string, vendorMail: string, stars: number) {
-    if (!citizenMail || !vendorMail) return;
-    try {
-      const key = `evenue_ratings_${citizenMail.toLowerCase().trim()}`;
-      const existing = getStoredCitizenRatings(citizenMail);
-      existing[vendorMail.toLowerCase().trim()] = stars;
-      localStorage.setItem(key, JSON.stringify(existing));
-    } catch {}
-  }
-
-  // 2. Extract Active Citizen Email
-  function getActiveCitizenEmail(): string {
-    const direct = localStorage.getItem("citizenEmail");
-    if (direct && direct.trim()) return direct.trim();
-
-    const storedUser = localStorage.getItem("evenue_user");
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed?.emailid) return parsed.emailid.trim();
-        if (parsed?.email) return parsed.email.trim();
-      } catch (e) {}
-    }
-
-    return "";
-  }
-
-  // 3. Page Load: Auto Load Citizen Ratings on Login/Refresh
+  // ----------------------------------------------------
+  // 3. PAGE LOAD: CITIZEN EMAIL & WISHLIST FETCH
+  // ----------------------------------------------------
   useEffect(() => {
-    const activeEmail = getActiveCitizenEmail();
-    if (activeEmail) {
-      setEmail(activeEmail);
+    const citizenMail = localStorage.getItem("citizenEmail");
 
-      // Instant UI restore: Logout ke baad login karne par turant pehle se diye hue stars dikhenge
-      const localSaved = getStoredCitizenRatings(activeEmail);
-      setUserRatings(localSaved);
-
-      // Fetch fresh wishlist & sync with backend database
-      doFetchWishlist(activeEmail);
+    if (citizenMail) {
+      setEmail(citizenMail);
+      fetchWishlist(citizenMail);
     } else {
       setLoading(false);
     }
   }, []);
 
-  async function doFetchWishlist(targetEmail: string) {
-    if (!targetEmail) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-
+  // Backend se favourite vendors ki list fetch karna
+  async function fetchWishlist(userEmail: string) {
     try {
+      setLoading(true);
       const resp = await axios.post(`${API_URL}/favrs/fetchWishlist`, {
-        citizenEmail: targetEmail.trim(),
+        citizenEmail: userEmail.trim(),
       });
 
-      if (resp.data.status === true) {
-        const list: Vendor[] = Array.isArray(resp.data.msg) ? resp.data.msg : [];
-        setVendors(list);
-
-        // Merge backend ratings with local citizen ratings
-        const localSaved = getStoredCitizenRatings(targetEmail);
-        const mergedRatings: { [vendorEmail: string]: number } = { ...localSaved };
-
-        list.forEach((v) => {
-          const vKey = v.emailid.toLowerCase().trim();
-          if (v.myGivenRating && v.myGivenRating > 0) {
-            mergedRatings[vKey] = v.myGivenRating;
-            saveStoredCitizenRating(targetEmail, vKey, v.myGivenRating);
-          }
-        });
-
-        setUserRatings(mergedRatings);
+      if (resp.data.status === true && Array.isArray(resp.data.msg)) {
+        setVendors(resp.data.msg);
       } else {
         setVendors([]);
       }
-    } catch (error) {
-      console.error("Error fetching wishlist:", error);
+    } catch (err) {
+      console.log("Error loading wishlist");
       setVendors([]);
     } finally {
       setLoading(false);
     }
   }
 
-  // ========================================================
-  // 4. SUBMIT / UPDATE 5-STAR RATING
-  // ========================================================
+  // ----------------------------------------------------
+  // 4. SUBMIT 5-STAR RATING
+  // ----------------------------------------------------
   async function doRateVendor(vendorEmail: string, stars: number) {
     if (!email) {
-      alert("Please log in as a citizen to rate vendors.");
+      alert("Please login first to rate this vendor!");
       return;
     }
 
-    const cleanVendorEmail = vendorEmail.trim();
-
     try {
-      setRatingSubmitting((prev) => ({ ...prev, [cleanVendorEmail]: true }));
-
-      // Instant local persistence: Save right away for this citizen
-      saveStoredCitizenRating(email, cleanVendorEmail, stars);
-      setUserRatings((prev) => ({
-        ...prev,
-        [cleanVendorEmail]: stars,
-        [cleanVendorEmail.toLowerCase()]: stars,
-      }));
-
-      // Send to backend endpoint: /favrs/rating
       const resp = await axios.post(`${API_URL}/favrs/rating`, {
-        vendorEmail: cleanVendorEmail,
-        citizenEmail: email.trim(),
+        vendorEmail: vendorEmail,
+        citizenEmail: email,
         rating: stars,
       });
 
       if (resp.data.status === true) {
-        // Update vendor's overallRating and reviewCount in state
+        // Vendors list me live rating update karna
         setVendors((prev) =>
-          prev.map((v) => {
-            if (v.emailid.toLowerCase().trim() === cleanVendorEmail.toLowerCase()) {
-              return {
-                ...v,
-                overallRating: resp.data.overallRating,
-                ratingCount: resp.data.ratingCount,
-                myGivenRating: stars,
-              };
-            }
-            return v;
-          })
+          prev.map((v) =>
+            v.emailid === vendorEmail
+              ? {
+                  ...v,
+                  overallRating: resp.data.overallRating || stars,
+                  ratingCount: resp.data.ratingCount || (v.ratingCount || 0) + 1,
+                  myGivenRating: stars,
+                }
+              : v
+          )
         );
-      } else {
-        alert(resp.data.msg || "Rating could not be saved.");
+        alert(`You rated ${stars} Stars!`);
       }
-    } catch (error: any) {
-      console.error("Rating submission error:", error);
-      alert("Error submitting rating.");
-    } finally {
-      setRatingSubmitting((prev) => ({ ...prev, [cleanVendorEmail]: false }));
+    } catch (err) {
+      alert("Error submitting rating!");
     }
   }
 
-  // ========================================================
+  // ----------------------------------------------------
   // 5. REMOVE FROM WISHLIST
-  // ========================================================
+  // ----------------------------------------------------
   async function doRemoveFromWishlist(vendorEmail: string, businessName: string) {
-    if (!window.confirm(`Remove "${businessName || vendorEmail}" from favorites?`)) return;
-
-    setRemovingEmail(vendorEmail);
+    const isConfirm = window.confirm(`Remove "${businessName}" from favorites?`);
+    if (!isConfirm) return;
 
     try {
       const resp = await axios.post(`${API_URL}/favrs/RemoveFavs`, {
-        citizenEmail: email.trim(),
-        vendorEmail: vendorEmail.trim(),
+        citizenEmail: email,
+        vendorEmail: vendorEmail,
       });
 
       if (resp.data.status === true) {
+        // List se vendor turant remove karein
         setVendors((prev) => prev.filter((v) => v.emailid !== vendorEmail));
       } else {
         alert(resp.data.msg || "Could not remove vendor.");
       }
-    } catch (error: any) {
-      console.error("Error removing vendor:", error);
-      alert("Error removing vendor from favorites.");
-    } finally {
-      setRemovingEmail(null);
+    } catch (err) {
+      alert("Error removing vendor!");
     }
   }
 
+  // Helper: Established Year clean format
   function formatEstd(val: string): string {
     if (!val) return "";
     const d = new Date(val);
     return isNaN(d.getTime()) ? val : String(d.getFullYear());
   }
 
-  function isValidPic(url?: string): boolean {
-    return Boolean(url && url.trim() !== "" && url !== "No_Pic.jpg");
-  }
-
+  // ----------------------------------------------------
+  // 6. EXACT SAME USER INTERFACE (UI)
+  // ----------------------------------------------------
   return (
     <div className="w-full text-[#11130F] font-sans antialiased py-2">
       
-      {/* 1. Header Banner */}
+      {/* ================= 1. HEADER BANNER ================= */}
       <div className="mb-6 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-xl relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-emerald-600/20 blur-3xl pointer-events-none" />
         
@@ -261,7 +182,7 @@ export default function Favs() {
             )}
 
             <button
-              onClick={() => doFetchWishlist(email)}
+              onClick={() => fetchWishlist(email)}
               disabled={loading}
               title="Refresh Wishlist"
               className="p-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition active:scale-95 cursor-pointer disabled:opacity-50"
@@ -284,7 +205,7 @@ export default function Favs() {
         </div>
       </div>
 
-      {/* 2. Top Stats Bar */}
+      {/* ================= 2. STATS BAR ================= */}
       <div className="bg-white rounded-2xl border border-stone-200/80 px-6 py-4 mb-6 shadow-xs flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="font-serif text-base font-bold text-stone-900">Saved Wishlist</span>
@@ -302,7 +223,7 @@ export default function Favs() {
         </button>
       </div>
 
-      {/* 3. Loading Skeleton */}
+      {/* ================= 3. LOADING SKELETON ================= */}
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
           {[1, 2, 3].map((n) => (
@@ -310,13 +231,12 @@ export default function Favs() {
               <div className="w-full h-48 bg-stone-200 rounded-2xl" />
               <div className="h-4 bg-stone-200 rounded-md w-3/4" />
               <div className="h-3 bg-stone-100 rounded-md w-1/2" />
-              <div className="h-10 bg-stone-100 rounded-xl" />
             </div>
           ))}
         </div>
       )}
 
-      {/* 4. Empty Wishlist Prompt */}
+      {/* ================= 4. EMPTY WISHLIST PROMPT ================= */}
       {!loading && vendors.length === 0 && (
         <div className="text-center py-16 px-4 bg-white rounded-3xl border border-stone-200/90 shadow-sm">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 text-emerald-900 flex items-center justify-center text-3xl font-serif">
@@ -340,23 +260,19 @@ export default function Favs() {
         </div>
       )}
 
-      {/* 5. Rendered Vendor Cards */}
+      {/* ================= 5. VENDOR CARDS GRID ================= */}
       {!loading && vendors.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {vendors.map((vendor, index) => {
             const currentOverall = Number(vendor.overallRating) || 0;
             const currentCount = Number(vendor.ratingCount) || 0;
-            const hovered = hoveredRating[vendor.emailid] || 0;
+            const userRated = vendor.myGivenRating || 0;
 
-            // Rating matching (case-insensitive)
-            const userRated =
-              userRatings[vendor.emailid] ||
-              userRatings[vendor.emailid.toLowerCase().trim()] ||
-              vendor.myGivenRating ||
-              0;
+            // Hover status check
+            const isCardHovered = hoveredEmail === vendor.emailid;
+            const activeStarDisplay = isCardHovered && hoveredStars > 0 ? hoveredStars : userRated;
 
-            const isSubmittingRating = ratingSubmitting[vendor.emailid] || false;
-            const hasValidImage = isValidPic(vendor.shoppicurl);
+            const hasValidImage = Boolean(vendor.shoppicurl && vendor.shoppicurl !== "No_Pic.jpg");
 
             return (
               <div
@@ -389,22 +305,22 @@ export default function Favs() {
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
 
-                  {/* Dynamic City Tag */}
+                  {/* City Tag */}
                   {vendor.city && (
                     <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-md text-stone-900 text-[10px] font-bold px-3 py-1 rounded-full shadow-xs">
                       📍 {vendor.city}
                     </span>
                   )}
 
-                  {/* Dynamic Established Date Tag */}
+                  {/* Established Tag */}
                   {vendor.estd && (
                     <span className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-medium px-2.5 py-0.5 rounded-full border border-white/10">
                       Estd. {formatEstd(vendor.estd)}
                     </span>
                   )}
 
-                  {/* Dynamic Certificate Link */}
-                  {isValidPic(vendor.certpicurl) && (
+                  {/* Certificate Link */}
+                  {vendor.certpicurl && vendor.certpicurl !== "No_Pic.jpg" && (
                     <a
                       href={vendor.certpicurl}
                       target="_blank"
@@ -417,10 +333,10 @@ export default function Favs() {
                   )}
                 </div>
 
-                {/* Card Body */}
+                {/* Card Details */}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div>
-                    {/* Header: Business & Owner Name */}
+                    {/* Business & Owner Name */}
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-emerald-950 transition-colors leading-snug">
@@ -433,7 +349,7 @@ export default function Favs() {
                         )}
                       </div>
 
-                      {/* Dynamic Rating Score Badge */}
+                      {/* Average Rating Badge */}
                       <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shrink-0">
                         <span className="text-amber-500 text-xs">★</span>
                         <span className="text-xs font-bold text-amber-950">
@@ -445,7 +361,7 @@ export default function Favs() {
                       </div>
                     </div>
 
-                    {/* Dynamic Address */}
+                    {/* Address */}
                     {(vendor.address || vendor.area || vendor.city) && (
                       <p className="text-xs text-stone-600 mt-2.5 flex items-start gap-1.5 leading-relaxed">
                         <span className="text-emerald-800 shrink-0">📍</span>
@@ -457,7 +373,7 @@ export default function Favs() {
                       </p>
                     )}
 
-                    {/* Dynamic Categories */}
+                    {/* Categories Badges */}
                     {vendor.selcate && (
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {vendor.selcate
@@ -476,40 +392,35 @@ export default function Favs() {
                     )}
                   </div>
 
-                  {/* Dynamic 5-Star Interactive Rating (Persisted across Logout/Login) */}
+                  {/* 5-Star Interactive Rating */}
                   <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-stone-700 text-[11px] uppercase tracking-wider">
                         {userRated > 0 ? "Your Rating:" : "Rate Vendor:"}
                       </span>
                       <span className="text-[11px] font-medium text-emerald-800">
-                        {isSubmittingRating
-                          ? "Saving..."
-                          : userRated > 0
-                          ? `${userRated} ★ (Saved • Click to change)`
-                          : hovered > 0
-                          ? `${hovered} Star${hovered > 1 ? "s" : ""}`
-                          : "Tap a star"}
+                        {userRated > 0 ? `${userRated} ★ (Saved)` : "Tap a star to rate"}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between px-1">
                       {[1, 2, 3, 4, 5].map((star) => {
-                        const isFilled = hovered >= star || (!hovered && userRated >= star);
+                        const isFilled = activeStarDisplay >= star;
 
                         return (
                           <button
                             key={star}
                             type="button"
-                            disabled={isSubmittingRating}
-                            onMouseEnter={() =>
-                              setHoveredRating((prev) => ({ ...prev, [vendor.emailid]: star }))
-                            }
-                            onMouseLeave={() =>
-                              setHoveredRating((prev) => ({ ...prev, [vendor.emailid]: 0 }))
-                            }
+                            onMouseEnter={() => {
+                              setHoveredEmail(vendor.emailid);
+                              setHoveredStars(star);
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredEmail("");
+                              setHoveredStars(0);
+                            }}
                             onClick={() => doRateVendor(vendor.emailid, star)}
-                            className="p-1 text-xl sm:text-2xl transition-transform duration-150 hover:scale-125 cursor-pointer disabled:opacity-50 select-none focus:outline-none"
+                            className="p-1 text-xl sm:text-2xl transition-transform duration-150 hover:scale-125 cursor-pointer select-none focus:outline-none"
                             title={`Rate ${star} Star${star > 1 ? "s" : ""}`}
                           >
                             <span className={isFilled ? "text-amber-400 drop-shadow-xs" : "text-stone-300"}>
@@ -521,7 +432,7 @@ export default function Favs() {
                     </div>
                   </div>
 
-                  {/* Real Contact and Links */}
+                  {/* Contact Number & Links */}
                   <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs">
                     {vendor.contact ? (
                       <a
@@ -537,15 +448,10 @@ export default function Favs() {
                     <div className="flex items-center gap-1.5">
                       {vendor.insta && (
                         <a
-                          href={
-                            vendor.insta.startsWith("http")
-                              ? vendor.insta
-                              : `https://instagram.com/${vendor.insta.replace("@", "")}`
-                          }
+                          href={vendor.insta.startsWith("http") ? vendor.insta : `https://instagram.com/${vendor.insta.replace("@", "")}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-pink-600 hover:text-pink-700 font-semibold px-2 py-1 rounded-lg hover:bg-pink-50 transition"
-                          title="Instagram"
                         >
                           Insta
                         </a>
@@ -553,15 +459,10 @@ export default function Favs() {
 
                       {vendor.website && (
                         <a
-                          href={
-                            vendor.website.startsWith("http")
-                              ? vendor.website
-                              : `https://${vendor.website}`
-                          }
+                          href={vendor.website.startsWith("http") ? vendor.website : `https://${vendor.website}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-emerald-900 hover:text-emerald-950 font-semibold px-2 py-1 rounded-lg hover:bg-emerald-50 transition"
-                          title="Website"
                         >
                           Web
                         </a>
@@ -579,20 +480,17 @@ export default function Favs() {
                   </div>
                 </div>
 
-                {/* Remove from Wishlist Action */}
+                {/* Remove from Wishlist Button */}
                 <div className="p-5 pt-0">
                   <button
                     type="button"
                     onClick={() => doRemoveFromWishlist(vendor.emailid, vendor.business || vendor.name)}
-                    disabled={removingEmail === vendor.emailid}
-                    className="w-full py-2.5 bg-stone-50 hover:bg-red-50 text-stone-600 hover:text-red-700 border border-stone-200 hover:border-red-200 rounded-full font-semibold text-[11px] tracking-wider uppercase transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+                    className="w-full py-2.5 bg-stone-50 hover:bg-red-50 text-stone-600 hover:text-red-700 border border-stone-200 hover:border-red-200 rounded-full font-semibold text-[11px] tracking-wider uppercase transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
-                    <span>
-                      {removingEmail === vendor.emailid ? "Removing..." : "Remove from Favorites"}
-                    </span>
+                    <span>Remove from Favorites</span>
                   </button>
                 </div>
 
@@ -602,14 +500,14 @@ export default function Favs() {
         </div>
       )}
 
-      {/* 6. Lightbox Zoom Modal */}
+      {/* ================= 6. LIGHTBOX ZOOM MODAL ================= */}
       {zoomedImage && (
         <div
           className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
           onClick={() => setZoomedImage(null)}
         >
           <div
-            className="relative max-w-3xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl animate-scaleUp"
+            className="relative max-w-3xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">

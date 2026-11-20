@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-const API_URL = import.meta.env.VITE_API_URL;
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:2005";
 
 // ----------------------------------------------------
-// Interfaces
+// 1. DATA STRUCTURE
 // ----------------------------------------------------
 export interface VendorState {
   emailid: string;
@@ -20,21 +21,6 @@ export interface VendorState {
   insta: string;
   shoppic: File | null;
   certpic: File | null;
-}
-
-export interface FormErrors {
-  emailid?: string;
-  name?: string;
-  contact?: string;
-  business?: string;
-  area?: string;
-  address?: string;
-  city?: string;
-  estd?: string;
-  selcate?: string;
-  website?: string;
-  insta?: string;
-  shoppic?: string;
 }
 
 function VendorRegistration() {
@@ -55,19 +41,14 @@ function VendorRegistration() {
   };
 
   const [obj, setObj] = useState<VendorState>(initial_obj);
-  const [errors, setErrors] = useState<FormErrors>({});
   const [shopPicPrev, setShopPicPrev] = useState<string>("");
   const [certPicPrev, setCertPicPrev] = useState<string>("");
+
   const [loading, setLoading] = useState<boolean>(false);
-  
-  // Registration Status Trackers
   const [isExistingVendor, setIsExistingVendor] = useState<boolean>(false);
   const [isCheckingRecord, setIsCheckingRecord] = useState<boolean>(true);
-
-  // Dropdown Open / Close state
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState<boolean>(false);
 
-  // Available Categories
   const categoryOptions = [
     "Decoration",
     "Photography",
@@ -87,108 +68,55 @@ function VendorRegistration() {
     "Jagran Party",
     "Bhangra Group",
     "Cleaning",
-  
   ];
 
   // ----------------------------------------------------
-  // 1. AUTO-LOAD ON LOGIN & PAGE REFRESH (Seamless Fetch)
+  // 2. AUTO-FETCH DATA ON PAGE LOAD
   // ----------------------------------------------------
   useEffect(() => {
     let email = localStorage.getItem("vendorEmail");
 
-    if (!email) {
-      const storedUser = localStorage.getItem("evenue_user");
-      if (storedUser) {
-        try {
-          const parsed = JSON.parse(storedUser);
-          email = parsed.emailid;
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
     if (email) {
-      const cleanEmail = email.trim();
-      setObj((prev) => ({ ...prev, emailid: cleanEmail }));
-      // Automatically fetch details on page load / refresh
-      autoFetchVendorDetails(cleanEmail);
+      setObj((prev) => ({ ...prev, emailid: email }));
+      autoFetchVendorDetails(email);
     } else {
       setIsCheckingRecord(false);
     }
   }, []);
 
-  // ----------------------------------------------------
-  // 2. BACKGROUND AUTO-FETCH SERVICE
-  // ----------------------------------------------------
   async function autoFetchVendorDetails(emailToFetch: string) {
-    if (!emailToFetch) return;
-
     try {
       setIsCheckingRecord(true);
-      // const url = "http://localhost:2005/vendor/vendorFetch";
       const token = localStorage.getItem("token");
 
       const resp = await axios.post(
         `${API_URL}/vendor/vendorFetch`,
         { emailid: emailToFetch.trim() },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { authorization: `Bearer ${token}` } }
       );
 
       if (resp.data.status === true && resp.data.msg) {
         const vendorData = resp.data.msg;
 
-        let cleanEstd = "";
         if (vendorData.estd) {
-          try {
-            cleanEstd = new Date(vendorData.estd).toISOString().split("T")[0];
-          } catch (e) {
-            cleanEstd = String(vendorData.estd).split("T")[0];
-          }
+          vendorData.estd = vendorData.estd.split("T")[0];
         }
 
-        if (vendorData.business || vendorData.name || vendorData.contact) {
-          setObj({
-            emailid: vendorData.emailid || emailToFetch,
-            name: vendorData.name || "",
-            contact: vendorData.contact || "",
-            business: vendorData.business || "",
-            area: vendorData.area || "",
-            address: vendorData.address || "",
-            city: vendorData.city || "",
-            estd: cleanEstd,
-            selcate: vendorData.selcate || "",
-            website: vendorData.website || "",
-            insta: vendorData.insta || "",
-            shoppic: null,
-            certpic: null,
-          });
+        setObj(vendorData);
 
-          if (vendorData.shoppicurl && vendorData.shoppicurl !== "No_Pic.jpg") {
-            setShopPicPrev(vendorData.shoppicurl);
-          }
-
-          if (vendorData.certpicurl && vendorData.certpicurl !== "No_Pic.jpg") {
-            setCertPicPrev(vendorData.certpicurl);
-          }
-
-          setErrors({});
-          // Mark as existing vendor: Save = Disabled, Update = Enabled
-          setIsExistingVendor(true);
-        } else {
-          setIsExistingVendor(false);
+        if (vendorData.shoppicurl && vendorData.shoppicurl !== "No_Pic.jpg") {
+          setShopPicPrev(vendorData.shoppicurl);
         }
+        if (vendorData.certpicurl && vendorData.certpicurl !== "No_Pic.jpg") {
+          setCertPicPrev(vendorData.certpicurl);
+        }
+
+        setIsExistingVendor(true);
       } else {
-        // No existing record found: Save = Enabled, Update = Disabled
         setIsExistingVendor(false);
       }
     } catch (error) {
-      console.warn("Auto-fetch vendor note:", error);
+      console.log("No previous record found.");
       setIsExistingVendor(false);
     } finally {
       setIsCheckingRecord(false);
@@ -196,28 +124,19 @@ function VendorRegistration() {
   }
 
   // ----------------------------------------------------
-  // 3. INPUT HANDLERS
+  // 3. INPUT CHANGE HANDLERS
   // ----------------------------------------------------
-  function doUpdateObj(event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function doUpdateObj(event: React.ChangeEvent<HTMLInputElement>) {
     let { name, value } = event.target;
 
-    // Contact number restriction: Only digits & max 10
+    // Contact number restriction: Sirf numbers aur max 10
     if (name === "contact") {
       value = value.replace(/\D/g, "").slice(0, 10);
     }
 
-    setErrors((prev) => ({
-      ...prev,
-      [name]: "",
-    }));
-
-    setObj((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setObj((prev) => ({ ...prev, [name]: value }));
   }
 
-  // Multiple Category Toggle
   function doToggleCategory(chosen: string) {
     let list = obj.selcate
       ? obj.selcate.split(",").map((c) => c.trim()).filter(Boolean)
@@ -230,16 +149,13 @@ function VendorRegistration() {
     }
 
     setObj((prev) => ({ ...prev, selcate: list.join(", ") }));
-    setErrors((prev) => ({ ...prev, selcate: "" }));
   }
 
-  // File Upload Handlers
   function doShopPic(event: React.ChangeEvent<HTMLInputElement>) {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setObj((prev) => ({ ...prev, shoppic: file }));
       setShopPicPrev(URL.createObjectURL(file));
-      setErrors((prev) => ({ ...prev, shoppic: "" }));
     }
   }
 
@@ -252,89 +168,111 @@ function VendorRegistration() {
   }
 
   // ----------------------------------------------------
-  // 4. FORM VALIDATION
+  // 4. SIMPLE ALL-FIELDS VALIDATION (Beginner-Level)
   // ----------------------------------------------------
-  function validateForm(isUpdate: boolean = false): boolean {
-    const err: FormErrors = {};
-
-    if (!obj.emailid.trim()) err.emailid = "Email address is required";
-    if (!obj.name.trim()) err.name = "Owner full name is required";
-
-    const mobileRegex = /^[6-9]\d{9}$/;
-    if (!obj.contact.trim()) {
-      err.contact = "Contact number is required";
-    } else if (!mobileRegex.test(obj.contact)) {
-      err.contact = "Must be a valid 10-digit number starting with 6-9";
+  function checkValidation(isUpdate: boolean = false): boolean {
+    if (!obj.emailid.trim()) {
+      alert("Email is required!");
+      return false;
+    }
+    if (!obj.name.trim()) {
+      alert("Owner Name is required!");
+      return false;
+    }
+    if (!obj.contact.trim() || obj.contact.length !== 10) {
+      alert("Please enter a valid 10-digit Contact Number!");
+      return false;
+    }
+    if (!obj.business.trim()) {
+      alert("Business Name is required!");
+      return false;
+    }
+    if (!obj.area.trim()) {
+      alert("Area / Locality is required!");
+      return false;
+    }
+    if (!obj.address.trim()) {
+      alert("Street Address is required!");
+      return false;
+    }
+    if (!obj.city.trim()) {
+      alert("City is required!");
+      return false;
+    }
+    if (!obj.estd.trim()) {
+      alert("Established Date is required!");
+      return false;
+    }
+    if (!obj.selcate.trim()) {
+      alert("Please select at least one Business Category!");
+      return false;
+    }
+    if (!obj.website.trim()) {
+      alert("Website URL is required!");
+      return false;
+    }
+    if (!obj.insta.trim()) {
+      alert("Instagram Handle is required!");
+      return false;
     }
 
-    if (!obj.business.trim()) err.business = "Business name is required";
-    if (!obj.area.trim()) err.area = "Area / Locality is required";
-    if (!obj.address.trim()) err.address = "Street address is required";
-    if (!obj.city.trim()) err.city = "City is required";
-    if (!obj.estd.trim()) err.estd = "Established date is required";
-    if (!obj.selcate.trim()) err.selcate = "Please select at least one category";
-    if (!obj.website.trim()) err.website = "Website URL is required";
-    if (!obj.insta.trim()) err.insta = "Instagram ID is required";
-
-    // Photos Check
-    if (!isUpdate) {
-      if (!obj.shoppic) err.shoppic = "Storefront photo is required";
-    } else {
-      if (!obj.shoppic && !shopPicPrev) {
-        err.shoppic = "Storefront photo is required";
-      }
+    // Photo Check: Save karte time nayi photo chahiye, Update me purani bhi chalegi
+    if (!isUpdate && !obj.shoppic) {
+      alert("Storefront / Work Photo is required!");
+      return false;
+    }
+    if (isUpdate && !obj.shoppic && !shopPicPrev) {
+      alert("Storefront / Work Photo is required!");
+      return false;
     }
 
-    setErrors(err);
-    return Object.keys(err).length === 0;
+    return true; // Sabhi fields sahi hain
   }
 
   // ----------------------------------------------------
-  // 5. SAVE NEW VENDOR (Disabled if already saved)
+  // 5. HELPER: FORMDATA PACKER
+  // ----------------------------------------------------
+  function prepareFormData(): FormData {
+    const frmData = new FormData();
+    frmData.append("emailid", obj.emailid.trim());
+    frmData.append("name", obj.name.trim());
+    frmData.append("contact", obj.contact.trim());
+    frmData.append("business", obj.business.trim());
+    frmData.append("area", obj.area.trim());
+    frmData.append("address", obj.address.trim());
+    frmData.append("city", obj.city.trim());
+    frmData.append("estd", obj.estd);
+    frmData.append("selcate", obj.selcate.trim());
+    frmData.append("website", obj.website.trim());
+    frmData.append("insta", obj.insta.trim());
+
+    if (obj.shoppic) frmData.append("shoppic", obj.shoppic);
+    if (obj.certpic) frmData.append("certpic", obj.certpic);
+
+    return frmData;
+  }
+
+  // ----------------------------------------------------
+  // 6. SAVE RECORD
   // ----------------------------------------------------
   async function doFormSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isExistingVendor) {
-      alert("Your business profile is already registered! Use 'Update Details' to make changes.");
-      return;
-    }
-
-    if (!validateForm(false)) return;
+    // 1. Validation Check
+    if (!checkValidation(false)) return;
 
     try {
       setLoading(true);
-      // const url = "http://localhost:2005/vendor/vendorSave";
-      const frmData = new FormData();
-
-      frmData.append("emailid", obj.emailid.trim());
-      frmData.append("name", obj.name.trim());
-      frmData.append("contact", obj.contact.trim());
-      frmData.append("business", obj.business.trim());
-      frmData.append("area", obj.area.trim());
-      frmData.append("address", obj.address.trim());
-      frmData.append("city", obj.city.trim());
-      frmData.append("estd", obj.estd);
-      frmData.append("selcate", obj.selcate.trim());
-      frmData.append("website", obj.website.trim());
-      frmData.append("insta", obj.insta.trim());
-
-      if (obj.shoppic) frmData.append("shoppic", obj.shoppic);
-      if (obj.certpic) frmData.append("certpic", obj.certpic);
-
       const token = localStorage.getItem("token");
+      const frmData = prepareFormData();
 
       const resp = await axios.post(`${API_URL}/vendor/vendorSave`, frmData, {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
+        headers: { authorization: `Bearer ${token}` },
       });
 
       alert(resp.data.msg || "🎉 Vendor Profile Registered Successfully!");
-      // Automatically switch to registered state: Save disabled, Update enabled
       setIsExistingVendor(true);
     } catch (error) {
-      console.error(error);
       alert("Error saving vendor details!");
     } finally {
       setLoading(false);
@@ -342,60 +280,37 @@ function VendorRegistration() {
   }
 
   // ----------------------------------------------------
-  // 6. UPDATE EXISTING VENDOR (Enabled if already saved)
+  // 7. UPDATE RECORD
   // ----------------------------------------------------
   async function doUpdate() {
-    if (!isExistingVendor) {
-      alert("No registered business profile found. Please save your profile first!");
-      return;
-    }
-
-    if (!validateForm(true)) return;
+    // 1. Validation Check
+    if (!checkValidation(true)) return;
 
     try {
       setLoading(true);
-      // const url = "http://localhost:2005/vendor/vendorUpdate";
-      const frmData = new FormData();
-
-      frmData.append("emailid", obj.emailid.trim());
-      frmData.append("name", obj.name.trim());
-      frmData.append("contact", obj.contact.trim());
-      frmData.append("business", obj.business.trim());
-      frmData.append("area", obj.area.trim());
-      frmData.append("address", obj.address.trim());
-      frmData.append("city", obj.city.trim());
-      frmData.append("estd", obj.estd);
-      frmData.append("selcate", obj.selcate.trim());
-      frmData.append("website", obj.website.trim());
-      frmData.append("insta", obj.insta.trim());
-
-      if (obj.shoppic) frmData.append("shoppic", obj.shoppic);
-      if (obj.certpic) frmData.append("certpic", obj.certpic);
-
       const token = localStorage.getItem("token");
+      const frmData = prepareFormData();
 
       const resp = await axios.post(`${API_URL}/vendor/vendorUpdate`, frmData, {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
+        headers: { authorization: `Bearer ${token}` },
       });
 
       alert(resp.data.msg || "✓ Vendor Details Updated Successfully!");
     } catch (error) {
-      console.error(error);
       alert("Error updating vendor details!");
     } finally {
       setLoading(false);
     }
   }
 
+  // ----------------------------------------------------
+  // 8. EXACT SAME USER INTERFACE (UI)
+  // ----------------------------------------------------
   return (
     <div className="w-full flex justify-center py-6 px-3 sm:px-6 text-[#11130F]">
       <div className="w-full max-w-4xl bg-white rounded-3xl border border-stone-200/90 shadow-xl p-6 sm:p-10 space-y-7">
         
-        {/* ========================================================
-            1. TOP HEADER & VERIFICATION STATUS
-           ======================================================== */}
+        {/* ================= HEADER & STATUS ================= */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-100 gap-4">
           <div>
             <div className="flex items-center gap-2.5">
@@ -409,7 +324,6 @@ function VendorRegistration() {
             </p>
           </div>
 
-          {/* Dynamic Registration Status Pill */}
           <div className="flex items-center gap-2">
             {isCheckingRecord ? (
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 border border-stone-200 animate-pulse">
@@ -432,9 +346,7 @@ function VendorRegistration() {
 
         <form onSubmit={doFormSubmit} className="space-y-6">
 
-          {/* ========================================================
-              2. READ-ONLY REGISTERED EMAIL CARD (No Refresh Button)
-             ======================================================== */}
+          {/* ================= REGISTERED EMAIL (LOCKED) ================= */}
           <div className="p-4 sm:p-5 rounded-2xl bg-stone-50 border border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1.5">
@@ -453,9 +365,6 @@ function VendorRegistration() {
                 placeholder="vendor@evenue.com"
                 className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-medium text-stone-700 outline-none cursor-not-allowed select-all shadow-inner"
               />
-              {errors.emailid && (
-                <p className="text-xs text-red-600 font-medium mt-1">{errors.emailid}</p>
-              )}
             </div>
 
             <div className="hidden sm:flex flex-col items-end justify-center self-end sm:self-auto text-right">
@@ -467,9 +376,7 @@ function VendorRegistration() {
             </div>
           </div>
 
-          {/* ========================================================
-              3. OWNER NAME & CONTACT
-             ======================================================== */}
+          {/* ================= OWNER NAME & CONTACT ================= */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1.5">
@@ -481,13 +388,8 @@ function VendorRegistration() {
                 value={obj.name}
                 onChange={doUpdateObj}
                 placeholder="Owner's Full Name"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.name
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.name && <p className="text-xs text-red-600 font-medium mt-1">{errors.name}</p>}
             </div>
 
             <div>
@@ -501,19 +403,12 @@ function VendorRegistration() {
                 maxLength={10}
                 onChange={doUpdateObj}
                 placeholder="9876543210"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.contact
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.contact && <p className="text-xs text-red-600 font-medium mt-1">{errors.contact}</p>}
             </div>
           </div>
 
-          {/* ========================================================
-              4. BUSINESS NAME, AREA, ADDRESS
-             ======================================================== */}
+          {/* ================= BUSINESS NAME, AREA, ADDRESS ================= */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1.5">
@@ -525,13 +420,8 @@ function VendorRegistration() {
                 value={obj.business}
                 onChange={doUpdateObj}
                 placeholder="Business / Studio Name"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.business
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.business && <p className="text-xs text-red-600 font-medium mt-1">{errors.business}</p>}
             </div>
 
             <div>
@@ -544,13 +434,8 @@ function VendorRegistration() {
                 value={obj.area}
                 onChange={doUpdateObj}
                 placeholder="e.g. Model Town"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.area
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.area && <p className="text-xs text-red-600 font-medium mt-1">{errors.area}</p>}
             </div>
 
             <div>
@@ -563,19 +448,12 @@ function VendorRegistration() {
                 value={obj.address}
                 onChange={doUpdateObj}
                 placeholder="Shop No., Street Address"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.address
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.address && <p className="text-xs text-red-600 font-medium mt-1">{errors.address}</p>}
             </div>
           </div>
 
-          {/* ========================================================
-              5. CITY & ESTABLISHED DATE
-             ======================================================== */}
+          {/* ================= CITY & ESTABLISHED DATE ================= */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1.5">
@@ -587,13 +465,8 @@ function VendorRegistration() {
                 value={obj.city}
                 onChange={doUpdateObj}
                 placeholder="City Name"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.city
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.city && <p className="text-xs text-red-600 font-medium mt-1">{errors.city}</p>}
             </div>
 
             <div>
@@ -605,22 +478,13 @@ function VendorRegistration() {
                 name="estd"
                 value={obj.estd}
                 onChange={doUpdateObj}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.estd
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.estd && <p className="text-xs text-red-600 font-medium mt-1">{errors.estd}</p>}
             </div>
           </div>
 
-          {/* ========================================================
-              6. BUSINESS CATEGORIES MULTI-SELECT
-             ======================================================== */}
+          {/* ================= BUSINESS CATEGORIES MULTI-SELECT ================= */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            
-            {/* Multi-select Dropdown */}
             <div className="relative">
               <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1.5">
                 Select Business Categories <span className="text-red-500">*</span>
@@ -690,7 +554,6 @@ function VendorRegistration() {
               )}
             </div>
 
-            {/* Selected Categories Display */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1.5">
                 Active Categories Selected <span className="text-red-500">*</span>
@@ -701,20 +564,12 @@ function VendorRegistration() {
                 value={obj.selcate}
                 onChange={doUpdateObj}
                 placeholder="e.g. Photography, Catering"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.selcate
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.selcate && <p className="text-xs text-red-600 font-medium mt-1">{errors.selcate}</p>}
             </div>
-
           </div>
 
-          {/* ========================================================
-              7. WEBSITE & INSTAGRAM
-             ======================================================== */}
+          {/* ================= WEBSITE & INSTAGRAM ================= */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1.5">
@@ -726,13 +581,8 @@ function VendorRegistration() {
                 value={obj.website}
                 onChange={doUpdateObj}
                 placeholder="https://www.yourdomain.com"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.website
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.website && <p className="text-xs text-red-600 font-medium mt-1">{errors.website}</p>}
             </div>
 
             <div>
@@ -745,22 +595,15 @@ function VendorRegistration() {
                 value={obj.insta}
                 onChange={doUpdateObj}
                 placeholder="@your_instagram"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                  errors.insta
-                    ? "border-red-400 bg-red-50/20 focus:ring-1 focus:ring-red-400"
-                    : "border-stone-200 bg-stone-50/40 focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50/40 text-sm outline-none transition-all focus:bg-white focus:border-emerald-900 focus:ring-1 focus:ring-emerald-900"
               />
-              {errors.insta && <p className="text-xs text-red-600 font-medium mt-1">{errors.insta}</p>}
             </div>
           </div>
 
-          {/* ========================================================
-              8. SHOP PHOTO & CERTIFICATE UPLOAD
-             ======================================================== */}
+          {/* ================= PHOTOS & PREVIEWS ================= */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             
-            {/* Shop Photo */}
+            {/* Storefront Photo */}
             <div className="p-5 rounded-2xl border border-stone-200 bg-stone-50/40 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
                 Storefront / Work Photo <span className="text-red-500">*</span>
@@ -771,9 +614,6 @@ function VendorRegistration() {
                 onChange={doShopPic}
                 className="w-full text-xs text-stone-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-950 file:text-white hover:file:bg-emerald-900 transition cursor-pointer"
               />
-              {errors.shoppic && (
-                <p className="text-xs text-red-600 font-medium">{errors.shoppic}</p>
-              )}
               <div className="w-full h-36 border-2 border-dashed border-stone-200 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm">
                 {shopPicPrev ? (
                   <img src={shopPicPrev} alt="Shop Preview" className="w-full h-full object-cover" />
@@ -783,7 +623,7 @@ function VendorRegistration() {
               </div>
             </div>
 
-            {/* Business Certificate */}
+            {/* Certificate Photo */}
             <div className="p-5 rounded-2xl border border-stone-200 bg-stone-50/40 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
                 Business Certificate / License <span className="text-stone-400 font-normal">(Optional)</span>
@@ -805,11 +645,7 @@ function VendorRegistration() {
 
           </div>
 
-          {/* ========================================================
-              9. ACTION BUTTONS: SMART SAVE & UPDATE
-              - If New Vendor: Save is ENABLED, Update is DISABLED
-              - If Existing Vendor: Save is DISABLED, Update is ENABLED
-             ======================================================== */}
+          {/* ================= ACTION BUTTONS: SAVE & UPDATE ================= */}
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-4 border-t border-stone-100">
             
             {/* SAVE BUTTON */}
