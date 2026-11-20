@@ -16,7 +16,7 @@ import Favs from "./favs/Favs";
 import CitizenDash from "./dashboard/CitizenDash";
 import VendorDash from "./dashboard/VendorDash";
 import AdminDash from "./dashboard/AdminDash";
-import UpdatePassword from "./passwordchange/UpdatePassword";
+
 
 function App() {
   return (
@@ -26,7 +26,7 @@ function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
       <Route path="/vendorregistration" element={<VendorRegistration />} />
-      <Route path="/updatepass" element={<UpdatePassword />} />
+     
 
       {/* 2. CITIZEN DASHBOARD */}
       <Route path="/citizendash" element={<CitizenDash />}>
